@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import Onboarding from './Onboarding'
+import ChatTab from './ChatTab'
+import { apiRequest } from './api'
 
 const TABS = [
   { key: 'chat', label: '채팅' },
@@ -7,14 +10,35 @@ const TABS = [
 ]
 
 function App() {
+  const [phase, setPhase] = useState('loading')
   const [activeTab, setActiveTab] = useState('chat')
+
+  useEffect(() => {
+    apiRequest('/rooms')
+      .then((rooms) => setPhase(rooms.length === 0 ? 'onboarding' : 'main'))
+      .catch(() => setPhase('main'))
+  }, [])
+
+  if (phase === 'loading') {
+    return (
+      <div className="app">
+        <main className="screen">
+          <div className="placeholder">불러오는 중...</div>
+        </main>
+      </div>
+    )
+  }
+
+  if (phase === 'onboarding') {
+    return <Onboarding onComplete={() => { setPhase('main'); setActiveTab('chat') }} />
+  }
 
   return (
     <div className="app">
       <main className="screen">
-        <div className="placeholder">
-          {TABS.find((t) => t.key === activeTab)?.label} 화면
-        </div>
+        {activeTab === 'chat' && <ChatTab />}
+        {activeTab === 'people' && <div className="placeholder">사람 화면</div>}
+        {activeTab === 'memory' && <div className="placeholder">기억 화면</div>}
       </main>
       <nav className="tab-bar">
         {TABS.map((tab) => (
