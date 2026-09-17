@@ -1,17 +1,33 @@
 import { useState, useEffect } from 'react'
 import { apiRequest } from './api'
+import ChatRoom from './ChatRoom'
 
 function ChatTab() {
   const [rooms, setRooms] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [selectedRoomId, setSelectedRoomId] = useState(null)
 
-  useEffect(() => {
+  function loadRooms() {
+    setLoading(true)
     apiRequest('/rooms')
       .then(setRooms)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadRooms()
   }, [])
+
+  if (selectedRoomId !== null) {
+    return (
+      <ChatRoom
+        roomId={selectedRoomId}
+        onBack={() => { setSelectedRoomId(null); loadRooms() }}
+      />
+    )
+  }
 
   if (loading) return <div className="placeholder">불러오는 중...</div>
   if (error) return <div className="error-banner">{error}</div>
@@ -19,7 +35,7 @@ function ChatTab() {
   return (
     <ul className="room-list">
       {rooms.map((room) => (
-        <li key={room.id} className="room-item">
+        <li key={room.id} className="room-item" onClick={() => setSelectedRoomId(room.id)}>
           <div className="room-item-header">
             <span className="room-item-name">{room.name}</span>
             {!room.includes_me && <span className="room-item-badge">엿보기</span>}

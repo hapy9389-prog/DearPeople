@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from db import get_connection, init_db
 from routes_characters import router as characters_router
+from routes_messages import router as messages_router
 from routes_rooms import router as rooms_router
 
 
@@ -17,6 +18,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(characters_router)
 app.include_router(rooms_router)
+app.include_router(messages_router)
 
 
 @app.get("/api/health")

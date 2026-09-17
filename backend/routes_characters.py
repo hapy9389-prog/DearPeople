@@ -11,6 +11,23 @@ from db import get_connection
 router = APIRouter()
 
 
+def build_character_description(conn, character) -> str:
+    """캐릭터 설명 블록. memories는 매 호출마다 DB에서 새로 조회한다.
+    character는 최소 id, name, relation, calls_me, personality, speech_style를 가진 dict/Row."""
+    memories = conn.execute(
+        "SELECT content FROM memories WHERE character_id = ? ORDER BY id",
+        (character["id"],),
+    ).fetchall()
+    memory_text = "; ".join(m["content"] for m in memories) if memories else "(없음)"
+    return (
+        f"- {character['name']} (관계: {character['relation']}, "
+        f"나를 부르는 호칭: {character['calls_me']})\n"
+        f"  성격: {character['personality']}\n"
+        f"  말투: {character['speech_style']}\n"
+        f"  추억: {memory_text}"
+    )
+
+
 class CharacterDraftRequest(BaseModel):
     relation: str
     grp: str

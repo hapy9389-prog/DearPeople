@@ -6,30 +6,16 @@ from fastapi import APIRouter, HTTPException
 
 from ai import call_claude_json
 from db import get_connection
+from routes_characters import build_character_description
 
 router = APIRouter()
 
 
-def fetch_characters_with_memories(conn):
-    characters = conn.execute(
+def fetch_characters(conn):
+    rows = conn.execute(
         "SELECT id, relation, grp, name, personality, speech_style, calls_me FROM characters"
     ).fetchall()
-    result = []
-    for c in characters:
-        memories = conn.execute(
-            "SELECT content FROM memories WHERE character_id = ? ORDER BY id", (c["id"],)
-        ).fetchall()
-        result.append({
-            "id": c["id"],
-            "relation": c["relation"],
-            "grp": c["grp"],
-            "name": c["name"],
-            "personality": c["personality"],
-            "speech_style": c["speech_style"],
-            "calls_me": c["calls_me"],
-            "memories": [m["content"] for m in memories],
-        })
-    return result
+    return [dict(r) for r in rows]
 
 
 def build_room_plan(characters):
@@ -65,15 +51,8 @@ def build_room_plan(characters):
     return plan
 
 
-def build_room_message_prompt(room, members, my_name):
-    lines = []
-    for m in members:
-        memory_text = "; ".join(m["memories"]) if m["memories"] else "(없음)"
-        lines.append(
-            f"- {m['name']} (관계: {m['relation']}, 나를 부르는 호칭: {m['calls_me']})\n"
-            f"  성격: {m['personality']}\n  말투: {m['speech_style']}\n  추억: {memory_text}"
-        )
-    participants_block = "\n".join(lines)
+def build_room_message_prompt(conn, room, members, my_name):
+    participants_block = "\n".join(build_character_description(conn, m) for m in members)
 
     if room["includes_me"]:
         me_instruction = (
@@ -107,7 +86,11 @@ def resolve_sender(sender_name, member_name_to_id, my_name):
 
 def generate_room_messages(room, characters_by_id, my_name, chat_model):
     members = [characters_by_id[cid] for cid in room["member_ids"]]
-    system_prompt, user_message = build_room_message_prompt(room, members, my_name)
+    conn = get_connection()
+    try:
+        system_prompt, user_message = build_room_message_prompt(conn, room, members, my_name)
+    finally:
+        conn.close()
     msg_args = [{"role": "user", "content": user_message}]
     try:
         ai_messages = call_claude_json(system_prompt, msg_args, model=chat_model)
@@ -131,7 +114,7 @@ def generate_room_messages(room, characters_by_id, my_name, chat_model):
 def generate_rooms():
     conn = get_connection()
     try:
-        characters = fetch_characters_with_memories(conn)
+        characters = fetch_characters(conn)
         me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
     finally:
         conn.close()
