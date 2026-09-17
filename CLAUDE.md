@@ -16,7 +16,8 @@
 - 한 단계가 끝나면 실행 방법과 확인 방법을 3줄 이내로 알려준다.
 
 ## 기술 스택
-- backend/: Python 3.11+, FastAPI, 내장 sqlite3 (ORM 없음), anthropic SDK
+- backend/: Python 3.9 (macOS 기본 python3), FastAPI, 내장 sqlite3 (ORM 없음), anthropic SDK
+- Python 3.9에서 실행되어야 한다. X | None 타입 표기와 match 문을 쓰지 말고 typing.Optional을 쓴다. 패키지 버전은 3.9 호환 버전으로 고정한다.
 - frontend/: React + Vite, 일반 CSS. 모바일 세로 화면(최대 너비 430px) 기준
 - DB 파일: backend/dearpeople.db
 - 환경변수 (backend/.env): ANTHROPIC_API_KEY, CHAT_MODEL=claude-sonnet-5, FAST_MODEL=claude-haiku-4-5-20251001
