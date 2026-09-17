@@ -1,0 +1,10 @@
+{
+  "name": "dearpeople",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"backend/venv/bin/uvicorn main:app --reload --port 8000 --app-dir backend\" \"npm --prefix frontend run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
