@@ -7,6 +7,7 @@ from db import get_connection, init_db
 from routes_characters import router as characters_router
 from routes_messages import router as messages_router
 from routes_rooms import router as rooms_router
+from routes_tick import router as tick_router
 
 
 @asynccontextmanager
@@ -19,6 +20,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(characters_router)
 app.include_router(rooms_router)
 app.include_router(messages_router)
+app.include_router(tick_router)
 
 
 @app.get("/api/health")

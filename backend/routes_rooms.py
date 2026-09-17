@@ -54,6 +54,13 @@ def build_room_plan(characters):
 def build_room_message_prompt(conn, room, members, my_name):
     participants_block = "\n".join(build_character_description(conn, m) for m in members)
 
+    if room["type"] == "dm":
+        count_instruction = "그 캐릭터가 사용자에게 가볍게 말을 거는 정도로 1~2개의 메시지를 만드세요."
+    elif room["includes_me"]:
+        count_instruction = "여러 참여자가 사용자에게 한두 마디씩 건네는 정도로 2~4개의 메시지를 만드세요."
+    else:
+        count_instruction = "자연스러운 한국어 대화를 3~5개의 메시지로 만드세요."
+
     if room["includes_me"]:
         me_instruction = (
             f"이 대화방에는 사용자({my_name})도 있지만, 사용자의 발화는 생성하지 마세요. "
@@ -66,7 +73,8 @@ def build_room_message_prompt(conn, room, members, my_name):
         "당신은 모바일 채팅 앱 'DearPeople'의 대화 메시지를 생성하는 도우미입니다. "
         f"채팅방 이름은 '{room['name']}'이고 참여자는 다음과 같습니다.\n{participants_block}\n"
         f"{me_instruction}\n"
-        "각 참여자의 성격, 말투, 추억을 반영한 자연스러운 한국어 대화를 3~5개 메시지로 만드세요. "
+        f"각 참여자의 성격, 말투, 추억을 반영해서 {count_instruction} "
+        "같은 캐릭터가 3개 이상 연속으로 메시지를 보내지 않게 하세요. "
         "sender는 반드시 위 참여자 이름 중 하나여야 하며, 그 외의 이름(특히 사용자 이름)을 "
         "sender로 쓰면 안 됩니다. "
         "반드시 아래 JSON 배열 형식으로만 응답하고, 다른 설명이나 코드블록 표시는 출력하지 마세요.\n"

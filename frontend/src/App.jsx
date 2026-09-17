@@ -12,6 +12,7 @@ const TABS = [
 function App() {
   const [phase, setPhase] = useState('loading')
   const [activeTab, setActiveTab] = useState('chat')
+  const [roomBadges, setRoomBadges] = useState({})
 
   useEffect(() => {
     apiRequest('/rooms')
@@ -36,7 +37,7 @@ function App() {
   return (
     <div className="app">
       <main className="screen">
-        {activeTab === 'chat' && <ChatTab />}
+        {activeTab === 'chat' && <ChatTab roomBadges={roomBadges} setRoomBadges={setRoomBadges} />}
         {activeTab === 'people' && <div className="placeholder">사람 화면</div>}
         {activeTab === 'memory' && <div className="placeholder">기억 화면</div>}
       </main>
