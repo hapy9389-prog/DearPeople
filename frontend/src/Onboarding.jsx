@@ -103,7 +103,7 @@ function Onboarding({ onComplete, onExit }) {
 
       {step === 'character-form' && (
         loading === 'starting' ? (
-          <RoomGenerateLoader characters={savedCharacters} profileName={myName} profileEmoji="🙂" />
+          <RoomGenerateLoader characters={savedCharacters} profileName={myName} profileEmoji="user" />
         ) : (
           <>
             {savedCharacters.length > 0 && (

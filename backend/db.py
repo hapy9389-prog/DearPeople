@@ -18,7 +18,7 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            emoji TEXT NOT NULL DEFAULT '🙂',
+            emoji TEXT NOT NULL DEFAULT 'user',
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
@@ -91,7 +91,7 @@ def init_db() -> None:
 
     profile_cols = [row["name"] for row in conn.execute("PRAGMA table_info(profiles)").fetchall()]
     if "emoji" not in profile_cols:
-        conn.execute("ALTER TABLE profiles ADD COLUMN emoji TEXT NOT NULL DEFAULT '🙂'")
+        conn.execute("ALTER TABLE profiles ADD COLUMN emoji TEXT NOT NULL DEFAULT 'user'")
 
     room_cols2 = [row["name"] for row in conn.execute("PRAGMA table_info(rooms)").fetchall()]
     if "is_custom" not in room_cols2:

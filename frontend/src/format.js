@@ -28,17 +28,16 @@ export function formatDateDivider(createdAt) {
   }).format(toDate(createdAt))
 }
 
-const RELATION_EMOJI = {
-  '엄마': '👩', '아빠': '👨', '형제자매': '🧒', '친구': '🧑',
-  '할머니': '👵', '할아버지': '👴', '선배': '🧑', '동료': '🧑',
-}
-export function relationEmoji(relation) {
-  return RELATION_EMOJI[relation] || '🙂'
-}
-
 const AVATAR_PALETTE = ['#FADADD', '#FDE7C8', '#FFF3B0', '#D7F0D1', '#CDE7F0', '#D9D3F0', '#F0D9E8', '#E4D6C4']
 export function avatarColor(name) {
   let hash = 0
   for (let i = 0; i < (name || '').length; i++) hash += name.charCodeAt(i)
   return AVATAR_PALETTE[hash % AVATAR_PALETTE.length]
+}
+
+export function initialLetter(name) {
+  const trimmed = (name || '').trim()
+  if (!trimmed) return ''
+  const first = trimmed[0]
+  return /[a-zA-Z]/.test(first) ? first.toUpperCase() : first
 }

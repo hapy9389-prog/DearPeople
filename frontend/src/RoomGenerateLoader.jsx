@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { relationEmoji, avatarColor } from './format'
+import { avatarColor } from './format'
+import { AvatarInitial, ProfileIcon, normalizeProfileIcon } from './icons'
 
 const PHRASES = ['방을 만들고 있어요', '서로를 소개하는 중', '첫 대화를 나누는 중']
 const ORBIT_RADIUS = 60
@@ -31,14 +32,14 @@ function RoomGenerateLoader({ characters, profileName, profileEmoji }) {
                 style={{ transform: `rotate(${angle}deg) translate(${ORBIT_RADIUS}px)` }}
               >
                 <div className="avatar avatar-small" style={{ background: avatarColor(c.name) }}>
-                  {relationEmoji(c.relation)}
+                  <AvatarInitial name={c.name} size={32} />
                 </div>
               </div>
             )
           })}
         </div>
         <div className="avatar room-loader-center" style={{ background: avatarColor(profileName) }}>
-          {profileEmoji}
+          <ProfileIcon icon={normalizeProfileIcon(profileEmoji)} size={22} color="var(--text)" />
         </div>
       </div>
       <div className="room-loader-text">{PHRASES[phraseIndex]}</div>

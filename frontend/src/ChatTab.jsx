@@ -1,20 +1,25 @@
 import { useState, useEffect, useRef } from 'react'
 import { apiRequest } from './api'
-import { relationEmoji, avatarColor, formatTime } from './format'
+import { avatarColor, formatTime } from './format'
+import { AvatarInitial, ChatBubbleIcon } from './icons'
 import ChatRoom from './ChatRoom'
-import RoomCreateSheet from './RoomCreateSheet'
+
+const CLUSTER_POSITIONS = {
+  1: [{ left: 12, top: 12 }],
+  2: [{ left: 4, top: 4 }, { left: 16, top: 16 }],
+  3: [{ left: 12, top: 1 }, { left: 5, top: 17 }, { left: 19, top: 17 }],
+}
 
 function ChatTab({
-  roomBadges, setRoomBadges, characters, openRoom, setOpenRoom,
+  roomBadges, setRoomBadges, openRoom, setOpenRoom,
   autoTickEnabled, onToggleAutoTick, tickVersion,
-  animateRoomList, onRoomListAnimated,
+  animateRoomList, onRoomListAnimated, onOpenRoomCreate,
 }) {
   const [rooms, setRooms] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [ticking, setTicking] = useState(false)
   const [tickError, setTickError] = useState(null)
-  const [roomCreateOpen, setRoomCreateOpen] = useState(false)
   const prevOpenRoomIdRef = useRef(null)
   const prevTickVersionRef = useRef(tickVersion)
   // 이 마운트 시점의 값만 캡처한다 — 이후 부모 상태가 바뀌어도 이번 렌더의 애니메이션 여부는 그대로 유지.
@@ -23,8 +28,6 @@ function ChatTab({
   useEffect(() => {
     if (animateRoomList) onRoomListAnimated()
   }, [])
-
-  const relationByName = Object.fromEntries(characters.map((c) => [c.name, c.relation]))
 
   function loadRooms(silent = false) {
     if (!silent) setLoading(true)
@@ -62,11 +65,6 @@ function ChatTab({
     })
   }
 
-  function handleRoomCreated(room) {
-    setRoomCreateOpen(false)
-    setOpenRoom({ id: room.id, name: room.name, is_custom: true, justCreated: true })
-  }
-
   async function handleTick() {
     setTicking(true)
     setTickError(null)
@@ -89,7 +87,7 @@ function ChatTab({
 
   if (openRoom !== null) {
     return (
-      <ChatRoom roomId={openRoom.id} characters={characters} animateFirst={!!openRoom.justCreated} />
+      <ChatRoom roomId={openRoom.id} animateFirst={!!openRoom.justCreated} />
     )
   }
 
@@ -113,21 +111,16 @@ function ChatTab({
         </button>
       </div>
       <div className="tick-hint">
-        {autoTickEnabled
-          ? '대화가 자동으로 이어지는 중입니다.'
-          : '자동 시간 흐르기를 켜면 대화가 계속 이어집니다.'}
+        {autoTickEnabled ? '자동으로 대화가 이어져요' : '켜면 대화가 계속 이어져요'}
       </div>
-      <div className="room-create-bar">
-        <button type="button" className="btn-primary" onClick={() => setRoomCreateOpen(true)}>방 만들기</button>
-      </div>
-      {roomCreateOpen && (
-        <RoomCreateSheet
-          characters={characters}
-          onClose={() => setRoomCreateOpen(false)}
-          onCreated={handleRoomCreated}
-        />
-      )}
       {tickError && <div className="error-banner">{tickError}</div>}
+      {rooms.length === 0 ? (
+        <div className="empty-state">
+          <ChatBubbleIcon className="empty-state-icon" size={48} />
+          <div className="empty-state-text">아직 방이 없어요</div>
+          <button type="button" className="btn-primary" onClick={onOpenRoomCreate}>방 만들기</button>
+        </div>
+      ) : (
       <ul className="room-list">
         {rooms.map((room, roomIdx) => (
           <li
@@ -137,11 +130,46 @@ function ChatTab({
             onClick={() => handleEnterRoom(room)}
           >
             <div className="room-item-avatars">
-              {room.members.slice(0, 3).map((name, idx) => (
-                <div key={name + idx} className="avatar avatar-small" style={{ background: avatarColor(name) }}>
-                  {relationEmoji(relationByName[name])}
-                </div>
-              ))}
+              {(() => {
+                const total = room.members.length
+                if (total === 1) {
+                  const name = room.members[0]
+                  return (
+                    <div
+                      className="room-cluster-avatar room-cluster-avatar-solo"
+                      style={{ background: avatarColor(name) }}
+                    >
+                      <AvatarInitial name={name} size={40} />
+                    </div>
+                  )
+                }
+                const shownCount = Math.min(total, 3)
+                const positions = CLUSTER_POSITIONS[shownCount] || CLUSTER_POSITIONS[1]
+                return positions.map((pos, idx) => {
+                  const isOverflowSlot = total > 3 && idx === 2
+                  if (isOverflowSlot) {
+                    return (
+                      <div
+                        key="overflow"
+                        className="room-cluster-avatar room-cluster-avatar-more"
+                        style={{ left: pos.left, top: pos.top, zIndex: shownCount - idx }}
+                      >
+                        +{total - 2}
+                      </div>
+                    )
+                  }
+                  const name = room.members[idx]
+                  return (
+                    <div
+                      key={name + idx}
+                      className="room-cluster-avatar"
+                      style={{ left: pos.left, top: pos.top, background: avatarColor(name), zIndex: shownCount - idx }}
+                    >
+                      <AvatarInitial name={name} size={20} />
+                    </div>
+                  )
+                })
+              })()}
             </div>
             <div className="room-item-body">
               <span className="room-item-name">{room.name}</span>
@@ -164,6 +192,7 @@ function ChatTab({
           </li>
         ))}
       </ul>
+      )}
     </div>
   )
 }

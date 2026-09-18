@@ -1,4 +1,5 @@
-import { relationEmoji, avatarColor } from './format'
+import { avatarColor, initialLetter } from './format'
+import { ProfileIcon, normalizeProfileIcon } from './icons'
 
 const WIDTH = 320
 const HEIGHT = 280
@@ -66,9 +67,13 @@ function RelationshipDiagram({ profile, characters, onOpenMemories }) {
       ))}
       <g className="relationship-diagram-center">
         <circle cx={CENTER_X} cy={CENTER_Y} r={CENTER_NODE_RADIUS} fill="var(--accent)" />
-        <text x={CENTER_X} y={CENTER_Y} textAnchor="middle" dominantBaseline="central" fontSize="20">
-          {profile.emoji}
-        </text>
+        <ProfileIcon
+          icon={normalizeProfileIcon(profile.emoji)}
+          size={22}
+          color="var(--surface)"
+          x={CENTER_X - 11}
+          y={CENTER_Y - 11}
+        />
         <text
           x={CENTER_X} y={CENTER_Y + CENTER_NODE_RADIUS + 14}
           textAnchor="middle" fontSize="12" fontWeight="bold" fill="var(--text)"
@@ -86,9 +91,9 @@ function RelationshipDiagram({ profile, characters, onOpenMemories }) {
           <circle cx={x} cy={y} r={nodeRadius} fill={avatarColor(character.name)} />
           <text
             x={x} y={y} textAnchor="middle" dominantBaseline="central"
-            fontSize={nodeRadius > 22 ? 16 : 13}
+            fontSize={nodeRadius * 0.8} fontWeight="600" fill="var(--text)"
           >
-            {relationEmoji(character.relation)}
+            {initialLetter(character.name)}
           </text>
           <text x={x} y={y + nodeRadius + 12} textAnchor="middle" fontSize="11" fill="var(--text)">
             {character.name}

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiRequest } from './api'
+import { avatarColor } from './format'
+import { NoteIcon, AvatarInitial, MoreIcon, PlusIcon } from './icons'
 
 function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
   const [characters, setCharacters] = useState([])
@@ -8,6 +10,7 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
   const [error, setError] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [editingText, setEditingText] = useState('')
+  const [menuOpenId, setMenuOpenId] = useState(null)
   const [newMemoryText, setNewMemoryText] = useState('')
   const [toast, setToast] = useState(null)
 
@@ -25,6 +28,8 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
   useEffect(() => {
     if (selectedCharacterId === null) return
     setLoading(true)
+    setEditingId(null)
+    setMenuOpenId(null)
     apiRequest(`/characters/${selectedCharacterId}/memories`)
       .then(setMemories)
       .catch((e) => setError(e.message))
@@ -80,62 +85,99 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
 
   return (
     <div className="memory-tab">
-      <div className="memory-character-select">
-        <select
-          value={selectedCharacterId ?? ''}
-          onChange={(e) => onSelectCharacter(Number(e.target.value))}
-        >
-          {characters.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+      <div className="memory-character-strip">
+        {characters.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={`memory-character-chip${c.id === selectedCharacterId ? ' memory-character-chip-active' : ''}`}
+            onClick={() => onSelectCharacter(c.id)}
+          >
+            <span className="avatar avatar-small memory-character-avatar" style={{ background: avatarColor(c.name) }}>
+              <AvatarInitial name={c.name} size={32} />
+            </span>
+            <span className="memory-character-chip-name">{c.name}</span>
+          </button>
+        ))}
       </div>
 
-      {error && <div className="error-banner">{error}</div>}
-      {toast && <div className="toast">{toast}</div>}
+      <div className="memory-tab-body">
+        {error && <div className="error-banner">{error}</div>}
+        {toast && <div className="toast">{toast}</div>}
 
-      {loading ? (
-        <div className="placeholder">불러오는 중...</div>
-      ) : (
-        <ul className="memory-card-list">
-          {memories.map((m) => (
-            <li key={m.id} className="memory-card">
-              {editingId === m.id ? (
-                <>
-                  <input
-                    type="text"
-                    value={editingText}
-                    onChange={(e) => setEditingText(e.target.value)}
-                  />
-                  <div className="memory-card-actions">
-                    <button type="button" onClick={() => handleSaveEdit(m.id)}>저장</button>
-                    <button type="button" onClick={() => setEditingId(null)}>취소</button>
+        {loading ? (
+          <div className="placeholder">불러오는 중...</div>
+        ) : memories.length === 0 ? (
+          <div className="empty-state">
+            <NoteIcon className="empty-state-icon" size={48} />
+            <div className="empty-state-text">이 사람에 대한 기억이 아직 없어요</div>
+          </div>
+        ) : (
+          <ul className="memory-card-list">
+            {memories.map((m) => (
+              <li key={m.id} className="memory-card">
+                {editingId === m.id ? (
+                  <div className="memory-card-edit">
+                    <input
+                      type="text"
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                    />
+                    <div className="memory-card-edit-actions">
+                      <button type="button" className="btn-primary" onClick={() => handleSaveEdit(m.id)}>저장</button>
+                      <button type="button" className="memory-card-cancel" onClick={() => setEditingId(null)}>취소</button>
+                    </div>
                   </div>
-                </>
-              ) : (
-                <>
-                  <div className="memory-card-content">{m.content}</div>
-                  <div className="memory-card-actions">
-                    <button type="button" onClick={() => { setEditingId(m.id); setEditingText(m.content) }}>수정</button>
-                    <button type="button" onClick={() => handleDelete(m.id)}>삭제</button>
-                  </div>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+                ) : (
+                  <>
+                    <div className="memory-card-content">{m.content}</div>
+                    <div className="memory-card-menu-wrap">
+                      <button
+                        type="button"
+                        className="memory-card-more"
+                        onClick={() => setMenuOpenId(menuOpenId === m.id ? null : m.id)}
+                        aria-label="더보기"
+                      >
+                        <MoreIcon size={16} />
+                      </button>
+                      {menuOpenId === m.id && (
+                        <div className="memory-card-menu">
+                          <button
+                            type="button"
+                            onClick={() => { setEditingId(m.id); setEditingText(m.content); setMenuOpenId(null) }}
+                          >
+                            수정
+                          </button>
+                          <button type="button" onClick={() => { handleDelete(m.id); setMenuOpenId(null) }}>삭제</button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="memory-add-bar">
-        <textarea
-          rows={3}
-          value={newMemoryText}
-          onChange={(e) => setNewMemoryText(e.target.value)}
-          placeholder="새 기억 추가"
-        />
-        <button type="button" className="btn-primary" onClick={handleAdd} disabled={!newMemoryText.trim()}>
-          추가
-        </button>
+        <div className="memory-add-input-wrap">
+          <textarea
+            rows={2}
+            value={newMemoryText}
+            onChange={(e) => setNewMemoryText(e.target.value)}
+            placeholder="새 기억 추가"
+          />
+          <button
+            type="button"
+            className="memory-add-submit"
+            onClick={handleAdd}
+            disabled={!newMemoryText.trim()}
+            aria-label="추가"
+          >
+            <PlusIcon size={16} />
+          </button>
+        </div>
       </div>
     </div>
   )

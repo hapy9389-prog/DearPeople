@@ -22,7 +22,7 @@ class ProfileEmojiRequest(BaseModel):
     emoji: str
 
 
-EMOJI_CHOICES = ["🙂", "😀", "😎", "🐱", "🐶", "🌸", "⭐", "🍀"]
+EMOJI_CHOICES = ["user", "heart", "star", "flower", "cat", "dog", "moon", "leaf"]
 
 
 @router.get("/api/profiles")

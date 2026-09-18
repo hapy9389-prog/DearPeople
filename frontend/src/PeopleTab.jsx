@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiRequest } from './api'
+import { avatarColor } from './format'
+import { AvatarInitial, PeopleIcon, PlusIcon } from './icons'
 import CharacterForm from './CharacterForm'
 import RelationshipDiagram from './RelationshipDiagram'
 import RoomGenerateLoader from './RoomGenerateLoader'
@@ -131,12 +133,6 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
     <div className="people-tab">
       {toast && <div className="toast">{toast}</div>}
 
-      <div className="people-top-bar">
-        <button type="button" className="btn-primary" onClick={() => setAddingCharacter((v) => !v)}>
-          {addingCharacter ? '취소' : '캐릭터 추가'}
-        </button>
-      </div>
-
       {addingCharacter && (
         <div className="people-add-form">
           <CharacterForm onSaved={handleCharacterSaved} />
@@ -163,7 +159,23 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
         <RelationshipDiagram profile={profile} characters={characters} onOpenMemories={onOpenMemories} />
       )}
 
-      <ul className="people-list">
+      {characters.length === 0 && !addingCharacter ? (
+        <div className="empty-state">
+          <PeopleIcon className="empty-state-icon" size={48} />
+          <div className="empty-state-text">아직 만든 사람이 없어요</div>
+          <button type="button" className="btn-primary" onClick={() => setAddingCharacter(true)}>캐릭터 추가</button>
+        </div>
+      ) : (
+      <>
+        <button
+          type="button"
+          className="people-add-character-button"
+          onClick={() => setAddingCharacter((v) => !v)}
+        >
+          <PlusIcon size={16} />
+          <span>{addingCharacter ? '취소' : '캐릭터 추가'}</span>
+        </button>
+        <ul className="people-list">
         {characters.map((c) => {
           const isEditing = editingId === c.id
           let roomImpact = false
@@ -179,6 +191,9 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
                 onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
               >
                 <div className="people-item-main">
+                  <span className="avatar avatar-small" style={{ background: avatarColor(c.name) }}>
+                    <AvatarInitial name={c.name} size={32} />
+                  </span>
                   <span className="people-item-name">{c.name}</span>
                   <span className="people-item-relation">{c.relation}</span>
                 </div>
@@ -306,7 +321,9 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
             </li>
           )
         })}
-      </ul>
+        </ul>
+      </>
+      )}
     </div>
   )
 }

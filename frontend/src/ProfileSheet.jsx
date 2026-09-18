@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiRequest } from './api'
 import { avatarColor } from './format'
-
-const EMOJI_CHOICES = ['🙂', '😀', '😎', '🐱', '🐶', '🌸', '⭐', '🍀']
+import { ProfileIcon, PROFILE_ICON_OPTIONS, normalizeProfileIcon, TrashIcon } from './icons'
 
 function ProfileSheet({ onClose, onSwitched, onCreated, onCleared }) {
   const [profiles, setProfiles] = useState([])
@@ -118,20 +117,23 @@ function ProfileSheet({ onClose, onSwitched, onCreated, onCleared }) {
         ) : (
           <ul className="profile-sheet-list">
             {profiles.map((p) => (
-              <li key={p.id} className="profile-sheet-item">
-                <button
-                  type="button"
-                  className="avatar profile-sheet-avatar"
-                  style={{ background: avatarColor(p.name) }}
-                  onClick={(e) => { e.stopPropagation(); setPickerForId(pickerForId === p.id ? null : p.id) }}
-                  disabled={busy}
-                >
-                  {p.emoji}
-                </button>
-                <div className="profile-sheet-row-wrap">
+              <li
+                key={p.id}
+                className={`profile-sheet-item${p.id === currentProfileId ? ' profile-sheet-item-current' : ''}`}
+              >
+                <div className="profile-sheet-item-row">
                   <button
                     type="button"
-                    className={`profile-sheet-row${p.id === currentProfileId ? ' profile-sheet-row-current' : ''}`}
+                    className="avatar profile-sheet-avatar"
+                    style={{ background: avatarColor(p.name) }}
+                    onClick={(e) => { e.stopPropagation(); setPickerForId(pickerForId === p.id ? null : p.id) }}
+                    disabled={busy}
+                  >
+                    <ProfileIcon icon={normalizeProfileIcon(p.emoji)} size={18} color="var(--text)" />
+                  </button>
+                  <button
+                    type="button"
+                    className="profile-sheet-main"
                     onClick={() => handleSwitch(p)}
                     disabled={busy}
                   >
@@ -141,30 +143,32 @@ function ProfileSheet({ onClose, onSwitched, onCreated, onCleared }) {
                     </span>
                     <span className="profile-sheet-count">캐릭터 {p.character_count}명</span>
                   </button>
-                  {pickerForId === p.id && (
-                    <div className="profile-sheet-emoji-picker">
-                      {EMOJI_CHOICES.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          className="profile-sheet-emoji-option"
-                          onClick={() => handleEmojiSelect(p, emoji)}
-                          disabled={busy}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    className="profile-sheet-delete"
+                    onClick={() => handleDeleteOrClear(p)}
+                    disabled={busy}
+                    aria-label={profiles.length <= 1 ? '비우기' : '삭제'}
+                    title={profiles.length <= 1 ? '비우기' : '삭제'}
+                  >
+                    <TrashIcon size={16} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="profile-sheet-delete"
-                  onClick={() => handleDeleteOrClear(p)}
-                  disabled={busy}
-                >
-                  {profiles.length <= 1 ? '비우기' : '삭제'}
-                </button>
+                {pickerForId === p.id && (
+                  <div className="profile-sheet-emoji-picker">
+                    {PROFILE_ICON_OPTIONS.map((iconName) => (
+                      <button
+                        key={iconName}
+                        type="button"
+                        className="profile-sheet-emoji-option"
+                        onClick={() => handleEmojiSelect(p, iconName)}
+                        disabled={busy}
+                      >
+                        <ProfileIcon icon={iconName} size={16} />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

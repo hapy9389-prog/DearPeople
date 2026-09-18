@@ -1,10 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { apiRequest } from './api'
-import { relationEmoji, avatarColor, formatTime, formatDateDivider, kstDateKey, kstMinuteKey } from './format'
+import { avatarColor, formatTime, formatDateDivider, kstDateKey, kstMinuteKey } from './format'
+import { AvatarInitial, CameraIcon, SendIcon, ThoughtBubbleIcon } from './icons'
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
+
+const ENTRANCE_STAGGER_MS = 30
+const ENTRANCE_MAX_DELAY_MS = 150
 
 const ALLOWED_PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024
@@ -31,7 +35,7 @@ function withDisplayFlags(messages) {
   })
 }
 
-function ChatRoom({ roomId, characters, animateFirst }) {
+function ChatRoom({ roomId, animateFirst }) {
   const [room, setRoom] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -42,10 +46,11 @@ function ChatRoom({ roomId, characters, animateFirst }) {
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null)
   const [photoCaption, setPhotoCaption] = useState('')
+  const [entranceCount, setEntranceCount] = useState(0)
   const bottomRef = useRef(null)
+  const messagesContainerRef = useRef(null)
+  const snapToBottomRef = useRef(false)
   const fileInputRef = useRef(null)
-
-  const relationById = Object.fromEntries(characters.map((c) => [c.id, c.relation]))
 
   useEffect(() => {
     apiRequest(`/rooms/${roomId}/messages`)
@@ -56,11 +61,20 @@ function ChatRoom({ roomId, characters, animateFirst }) {
           setTyping(true)
           await revealReplies(data.messages)
         } else {
+          // 처음 들어왔을 때는 스크롤을 먼저 맨 아래로 내린 뒤에 등장 애니메이션이 보이도록 한다.
+          snapToBottomRef.current = true
           setMessages(data.messages)
+          setEntranceCount(data.messages.length)
         }
       })
       .catch((e) => { setError(e.message); setLoading(false) })
   }, [roomId])
+
+  useLayoutEffect(() => {
+    if (!snapToBottomRef.current || !messagesContainerRef.current) return
+    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+    snapToBottomRef.current = false
+  }, [messages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -162,9 +176,21 @@ function ChatRoom({ roomId, characters, animateFirst }) {
     <div className="chat-room">
       {!room.includes_me && <div className="peek-banner">엿보는 중</div>}
       {error && <div className="error-banner">{error}</div>}
-      <div className="chat-room-messages">
-        {withDisplayFlags(messages).map((m) => (
-          <div key={m.id} className="message-block">
+      <div className="chat-room-messages" ref={messagesContainerRef}>
+        {messages.length === 0 && !typing && (
+          <div className="empty-state">
+            <ThoughtBubbleIcon className="empty-state-icon" size={48} />
+            <div className="empty-state-text">아직 대화가 없어요. 먼저 말을 걸어보세요</div>
+          </div>
+        )}
+        {withDisplayFlags(messages).map((m, idx) => (
+          <div
+            key={m.id}
+            className={`message-block${idx < entranceCount ? ' message-enter' : ''}`}
+            style={idx < entranceCount
+              ? { animationDelay: `${Math.min(idx * ENTRANCE_STAGGER_MS, ENTRANCE_MAX_DELAY_MS)}ms` }
+              : undefined}
+          >
             {m.showDateDivider && (
               <div className="chat-date-divider"><span>{formatDateDivider(m.created_at)}</span></div>
             )}
@@ -172,7 +198,7 @@ function ChatRoom({ roomId, characters, animateFirst }) {
               {m.sender_character_id !== null && m.showAvatar && (
                 <div className="bubble-header">
                   <div className="avatar avatar-small" style={{ background: avatarColor(m.sender) }}>
-                    {relationEmoji(relationById[m.sender_character_id])}
+                    <AvatarInitial name={m.sender} size={32} />
                   </div>
                   <span className="bubble-sender">{m.sender}</span>
                 </div>
@@ -247,7 +273,7 @@ function ChatRoom({ roomId, characters, animateFirst }) {
               onClick={() => fileInputRef.current.click()}
               disabled={sending}
             >
-              📷
+              <CameraIcon size={20} />
             </button>
             <input
               type="text"
@@ -262,8 +288,9 @@ function ChatRoom({ roomId, characters, animateFirst }) {
               className="btn-primary"
               onClick={handleSend}
               disabled={sending || (photoFile ? false : !input.trim())}
+              aria-label="전송"
             >
-              전송
+              <SendIcon size={18} />
             </button>
           </div>
         </>

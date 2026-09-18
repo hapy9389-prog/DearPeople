@@ -4,8 +4,10 @@ import ChatTab from './ChatTab'
 import PeopleTab from './PeopleTab'
 import MemoryTab from './MemoryTab'
 import ProfileSheet from './ProfileSheet'
+import RoomCreateSheet from './RoomCreateSheet'
 import { apiRequest } from './api'
 import { avatarColor } from './format'
+import { ArrowLeftIcon, ChevronDownIcon, PlusIcon, ProfileIcon, normalizeProfileIcon } from './icons'
 
 const TABS = [
   { key: 'chat', label: '채팅' },
@@ -27,6 +29,7 @@ function App() {
   const [openRoom, setOpenRoom] = useState(null)
   const [profile, setProfile] = useState({ id: null, name: '', emoji: '🙂' })
   const [profileSheetOpen, setProfileSheetOpen] = useState(false)
+  const [roomCreateOpen, setRoomCreateOpen] = useState(false)
   const [profileVersion, setProfileVersion] = useState(0)
   const [autoTickEnabled, setAutoTickEnabled] = useState(() => {
     try { return localStorage.getItem(AUTO_TICK_STORAGE_KEY) === 'true' } catch (e) { return false }
@@ -54,6 +57,7 @@ function App() {
 
   function applyProfileSwitchCommon() {
     setProfileSheetOpen(false)
+    setRoomCreateOpen(false)
     setRoomBadges({})
     setOpenRoom(null)
     setMemoryTabCharacterId(null)
@@ -80,6 +84,11 @@ function App() {
 
   function handleRoomsRegenerated() {
     setAnimateRoomList(true)
+  }
+
+  function handleRoomCreated(room) {
+    setRoomCreateOpen(false)
+    setOpenRoom({ id: room.id, name: room.name, is_custom: true, justCreated: true })
   }
 
   async function handleDeleteRoom() {
@@ -173,23 +182,37 @@ function App() {
       <header className="app-header">
         {openRoom ? (
           <>
-            <button type="button" className="app-header-back" onClick={() => setOpenRoom(null)}>‹</button>
+            <button type="button" className="app-header-back" onClick={() => setOpenRoom(null)}>
+              <ArrowLeftIcon size={22} />
+            </button>
             <span className="app-header-title">{openRoom.name}</span>
             <button type="button" className="app-header-delete" onClick={handleDeleteRoom}>삭제</button>
           </>
         ) : (
-          <button type="button" className="app-header-profile-button" onClick={() => setProfileSheetOpen(true)}>
-            <span className="avatar app-header-avatar" style={{ background: avatarColor(profile.name) }}>
-              {profile.emoji}
-            </span>
-            <span className="app-header-brand">
-              <span className="app-header-logo">DearPeople</span>
-              <span className="app-header-username">
-                {profile.name}
-                <span className="app-header-profile-indicator">▾</span>
+          <>
+            <button type="button" className="app-header-profile-button" onClick={() => setProfileSheetOpen(true)}>
+              <span className="avatar app-header-avatar" style={{ background: avatarColor(profile.name) }}>
+                <ProfileIcon icon={normalizeProfileIcon(profile.emoji)} size={20} color="var(--text)" />
               </span>
-            </span>
-          </button>
+              <span className="app-header-brand">
+                <span className="app-header-logo">DearPeople</span>
+                <span className="app-header-username">
+                  {profile.name}
+                  <ChevronDownIcon className="app-header-profile-indicator" size={14} />
+                </span>
+              </span>
+            </button>
+            {activeTab === 'chat' && (
+              <button
+                type="button"
+                className="app-header-icon-button"
+                onClick={() => setRoomCreateOpen(true)}
+                aria-label="방 만들기"
+              >
+                <PlusIcon size={20} />
+              </button>
+            )}
+          </>
         )}
       </header>
       <main className="screen">
@@ -206,6 +229,7 @@ function App() {
             tickVersion={tickVersion}
             animateRoomList={animateRoomList}
             onRoomListAnimated={() => setAnimateRoomList(false)}
+            onOpenRoomCreate={() => setRoomCreateOpen(true)}
           />
         )}
         {activeTab === 'people' && (
@@ -243,6 +267,13 @@ function App() {
           onSwitched={handleProfileSwitched}
           onCreated={handleProfileCreated}
           onCleared={handleProfileCreated}
+        />
+      )}
+      {roomCreateOpen && (
+        <RoomCreateSheet
+          characters={characters}
+          onClose={() => setRoomCreateOpen(false)}
+          onCreated={handleRoomCreated}
         />
       )}
     </div>
