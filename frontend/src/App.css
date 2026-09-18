@@ -172,8 +172,44 @@ body {
   margin: 4px auto 12px;
 }
 
+.relationship-diagram-center,
+.relationship-diagram-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation-name: diagram-pop-in;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
 .relationship-diagram-node {
   cursor: pointer;
+}
+
+.relationship-diagram-line {
+  opacity: 0;
+  animation-name: diagram-fade-in;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
+@keyframes diagram-pop-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes diagram-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .relationship-diagram-center,
+  .relationship-diagram-node,
+  .relationship-diagram-line {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .field {
@@ -290,6 +326,23 @@ body {
 .room-item-peek {
   background: var(--bg);
   box-shadow: none;
+}
+
+.room-item-enter {
+  opacity: 0;
+  animation: room-item-enter 0.4s ease-out forwards;
+}
+
+@keyframes room-item-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-item-enter {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 .room-item-avatars {
@@ -641,6 +694,66 @@ body {
   margin-top: 8px;
   margin-bottom: 0;
   width: auto;
+}
+
+.room-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 16px;
+}
+
+.room-loader-stage {
+  position: relative;
+  width: 160px;
+  height: 160px;
+}
+
+.room-loader-orbit {
+  position: absolute;
+  inset: 0;
+  animation: room-loader-spin 3s linear infinite;
+}
+
+.room-loader-satellite {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+}
+
+.room-loader-satellite .avatar {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.room-loader-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+  z-index: 1;
+}
+
+.room-loader-text {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+@keyframes room-loader-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-loader-orbit {
+    animation: none;
+  }
 }
 
 .people-list {

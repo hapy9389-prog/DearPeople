@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { apiRequest } from './api'
 import CharacterForm from './CharacterForm'
 import RelationshipDiagram from './RelationshipDiagram'
+import RoomGenerateLoader from './RoomGenerateLoader'
 import { RELATION_TO_GRP, resolveRelationAndGrp, isRelationValid } from './relation'
 
 const BUILT_IN_RELATIONS = Object.keys(RELATION_TO_GRP)
@@ -19,7 +20,7 @@ function buildEditForm(c) {
   }
 }
 
-function PeopleTab({ profile, onOpenMemories, onCharactersChanged }) {
+function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegenerated }) {
   const [characters, setCharacters] = useState([])
   const [memoryCounts, setMemoryCounts] = useState({})
   const [expandedId, setExpandedId] = useState(null)
@@ -68,6 +69,7 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged }) {
     try {
       await apiRequest('/rooms/generate', { method: 'POST' })
       setNeedsRoomRegen(false)
+      onRoomsRegenerated()
     } catch (e) {
       setRegenerateError(e.message)
     } finally {
@@ -141,11 +143,17 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged }) {
 
       {needsRoomRegen && (
         <div className="people-regen-banner">
-          <div>방을 다시 만들어야 새 캐릭터가 대화에 참여합니다. 기존 대화는 모두 지워집니다.</div>
-          {regenerateError && <div className="error-banner">{regenerateError}</div>}
-          <button type="button" className="btn-primary" onClick={handleRegenerateRooms} disabled={regenerating}>
-            {regenerating ? '방 만드는 중...' : '방 다시 만들기'}
-          </button>
+          {regenerating ? (
+            <RoomGenerateLoader characters={characters} profileName={profile.name} profileEmoji={profile.emoji} />
+          ) : (
+            <>
+              <div>방을 다시 만들어야 새 캐릭터가 대화에 참여합니다. 기존 대화는 모두 지워집니다.</div>
+              {regenerateError && <div className="error-banner">{regenerateError}</div>}
+              <button type="button" className="btn-primary" onClick={handleRegenerateRooms}>
+                방 다시 만들기
+              </button>
+            </>
+          )}
         </div>
       )}
 

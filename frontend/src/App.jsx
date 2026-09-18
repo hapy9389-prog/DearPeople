@@ -32,6 +32,7 @@ function App() {
     try { return localStorage.getItem(AUTO_TICK_STORAGE_KEY) === 'true' } catch (e) { return false }
   })
   const [tickVersion, setTickVersion] = useState(0)
+  const [animateRoomList, setAnimateRoomList] = useState(false)
   const openRoomRef = useRef(openRoom)
   const autoTickRunningRef = useRef(false)
 
@@ -75,6 +76,10 @@ function App() {
   function handleTabClick(key) {
     if (key !== 'chat') setOpenRoom(null)
     setActiveTab(key)
+  }
+
+  function handleRoomsRegenerated() {
+    setAnimateRoomList(true)
   }
 
   async function handleDeleteRoom() {
@@ -151,7 +156,13 @@ function App() {
   if (phase === 'onboarding') {
     return (
       <Onboarding
-        onComplete={() => { refreshCharacters(); refreshProfile(); setPhase('main'); setActiveTab('chat') }}
+        onComplete={() => {
+          refreshCharacters()
+          refreshProfile()
+          setAnimateRoomList(true)
+          setPhase('main')
+          setActiveTab('chat')
+        }}
         onExit={handleProfileSwitched}
       />
     )
@@ -193,6 +204,8 @@ function App() {
             autoTickEnabled={autoTickEnabled}
             onToggleAutoTick={toggleAutoTick}
             tickVersion={tickVersion}
+            animateRoomList={animateRoomList}
+            onRoomListAnimated={() => setAnimateRoomList(false)}
           />
         )}
         {activeTab === 'people' && (
@@ -201,6 +214,7 @@ function App() {
             profile={profile}
             onOpenMemories={openMemoriesForCharacter}
             onCharactersChanged={refreshCharacters}
+            onRoomsRegenerated={handleRoomsRegenerated}
           />
         )}
         {activeTab === 'memory' && (

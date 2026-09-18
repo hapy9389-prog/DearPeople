@@ -7,6 +7,7 @@ import RoomCreateSheet from './RoomCreateSheet'
 function ChatTab({
   roomBadges, setRoomBadges, characters, openRoom, setOpenRoom,
   autoTickEnabled, onToggleAutoTick, tickVersion,
+  animateRoomList, onRoomListAnimated,
 }) {
   const [rooms, setRooms] = useState([])
   const [error, setError] = useState(null)
@@ -16,6 +17,12 @@ function ChatTab({
   const [roomCreateOpen, setRoomCreateOpen] = useState(false)
   const prevOpenRoomIdRef = useRef(null)
   const prevTickVersionRef = useRef(tickVersion)
+  // 이 마운트 시점의 값만 캡처한다 — 이후 부모 상태가 바뀌어도 이번 렌더의 애니메이션 여부는 그대로 유지.
+  const [shouldAnimateRooms] = useState(() => animateRoomList)
+
+  useEffect(() => {
+    if (animateRoomList) onRoomListAnimated()
+  }, [])
 
   const relationByName = Object.fromEntries(characters.map((c) => [c.name, c.relation]))
 
@@ -122,10 +129,11 @@ function ChatTab({
       )}
       {tickError && <div className="error-banner">{tickError}</div>}
       <ul className="room-list">
-        {rooms.map((room) => (
+        {rooms.map((room, roomIdx) => (
           <li
             key={room.id}
-            className={`room-item${!room.includes_me ? ' room-item-peek' : ''}`}
+            className={`room-item${!room.includes_me ? ' room-item-peek' : ''}${shouldAnimateRooms ? ' room-item-enter' : ''}`}
+            style={shouldAnimateRooms ? { animationDelay: `${roomIdx * 0.15}s` } : undefined}
             onClick={() => handleEnterRoom(room)}
           >
             <div className="room-item-avatars">

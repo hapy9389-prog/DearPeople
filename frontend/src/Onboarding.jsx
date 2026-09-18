@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiRequest } from './api'
 import CharacterForm from './CharacterForm'
+import RoomGenerateLoader from './RoomGenerateLoader'
 
 function Onboarding({ onComplete, onExit }) {
   const [myName, setMyName] = useState('')
@@ -101,27 +102,31 @@ function Onboarding({ onComplete, onExit }) {
       )}
 
       {step === 'character-form' && (
-        <>
-          {savedCharacters.length > 0 && (
-            <ul className="saved-character-list">
-              {savedCharacters.map((c, i) => (
-                <li key={i} className="saved-character-item">
-                  {c.relation} · {c.name}
-                </li>
-              ))}
-            </ul>
-          )}
+        loading === 'starting' ? (
+          <RoomGenerateLoader characters={savedCharacters} profileName={myName} profileEmoji="🙂" />
+        ) : (
+          <>
+            {savedCharacters.length > 0 && (
+              <ul className="saved-character-list">
+                {savedCharacters.map((c, i) => (
+                  <li key={i} className="saved-character-item">
+                    {c.relation} · {c.name}
+                  </li>
+                ))}
+              </ul>
+            )}
 
-          {savedCharacters.length >= 2 && (
-            <div className="start-button-wrap">
-              <button type="button" className="btn-primary" onClick={handleStart} disabled={loading === 'starting'}>
-                {loading === 'starting' ? '방 만드는 중...' : '시작하기'}
-              </button>
-            </div>
-          )}
+            {savedCharacters.length >= 2 && (
+              <div className="start-button-wrap">
+                <button type="button" className="btn-primary" onClick={handleStart} disabled={loading === 'starting'}>
+                  시작하기
+                </button>
+              </div>
+            )}
 
-          <CharacterForm onSaved={handleCharacterSaved} />
-        </>
+            <CharacterForm onSaved={handleCharacterSaved} />
+          </>
+        )
       )}
     </div>
   )
