@@ -9,7 +9,7 @@ from ai import call_claude_json
 from db import get_connection, get_current_profile_id
 from images import pick_photo
 from routes_characters import build_character_description
-from routes_messages import fetch_recent_messages, format_recent_conversation
+from routes_messages import CHARACTER_PHOTO_PROBABILITY, fetch_recent_messages, format_recent_conversation
 from routes_rooms import resolve_sender
 
 router = APIRouter()
@@ -120,6 +120,15 @@ def generate_no_me_conversation(conn, room, members, my_name, chat_model):
 def generate_initiate_messages(conn, room, members, my_name, chat_model):
     member_blocks = "\n".join(build_character_description(conn, m) for m in members)
     conversation = format_recent_conversation(fetch_recent_messages(conn, room["id"], 20), my_name)
+    if random.random() < CHARACTER_PHOTO_PROBABILITY:
+        photo_instruction = (
+            "메시지 중 하나는 사진을 공유하는 형태로 만들 수 있습니다(그 메시지의 type은 'photo'). "
+            "사진 메시지는 category(food/scenery/pet/object/place 중 하나), "
+            "description(사진 속 장면을 한두 문장으로 묘사, 사람 얼굴은 묘사하지 않음), "
+            "caption(그 사진에 캐릭터가 붙이는 짧은 말)을 포함하세요."
+        )
+    else:
+        photo_instruction = "이번에는 사진 없이 텍스트 메시지만 만드세요(모든 메시지의 type은 'text')."
     system_prompt = (
         "당신은 모바일 채팅 앱 'DearPeople'에서, 시간이 좀 지난 뒤 캐릭터가 사용자에게 먼저 "
         "말을 거는 메시지를 생성하는 도우미입니다. "
@@ -128,9 +137,12 @@ def generate_initiate_messages(conn, room, members, my_name, chat_model):
         f"참여자 중 한 명이 사용자({my_name})에게 먼저 말을 거는 메시지를 1~2개 만드세요. "
         "이전 대화를 반복하지 말고 자연스럽게 새로 시작하세요. "
         "추억과 최근 대화에 없는 사건을 사실처럼 지어내지 마세요. "
+        f"{photo_instruction} "
+        "사진이 아닌 메시지는 type을 'text'로 하고 content만 채우세요. "
         "sender는 반드시 위 참여자 이름 중 하나여야 하며, 사용자 이름을 sender로 쓰면 안 됩니다. "
         "반드시 아래 JSON 배열 형식으로만 응답하고, 다른 설명이나 코드블록 표시는 출력하지 마세요.\n"
-        '[{"sender": "이름", "content": "메시지 내용"}, ...]'
+        '[{"sender": "이름", "type": "text", "content": "메시지 내용"}, '
+        '{"sender": "이름", "type": "photo", "category": "food", "description": "장면 묘사", "caption": "캡션"}]'
     )
     result = call_claude_json(
         system_prompt=system_prompt,
@@ -138,7 +150,7 @@ def generate_initiate_messages(conn, room, members, my_name, chat_model):
         model=chat_model,
     )
     name_to_id = {m["name"]: m["id"] for m in members}
-    return resolve_generated_messages(result, name_to_id, my_name)
+    return resolve_generated_messages(result, name_to_id, my_name, allow_photo=True)
 
 
 def generate_tick_messages_for_room(room, my_name, chat_model):

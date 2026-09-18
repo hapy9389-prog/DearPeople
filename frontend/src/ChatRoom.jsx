@@ -6,6 +6,9 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+const ALLOWED_PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp']
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024
+
 function withDisplayFlags(messages) {
   let prevSenderId, prevDateKey
   return messages.map((m, i) => {
@@ -36,7 +39,11 @@ function ChatRoom({ roomId, characters, animateFirst }) {
   const [typing, setTyping] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null)
+  const [photoCaption, setPhotoCaption] = useState('')
   const bottomRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   const relationById = Object.fromEntries(characters.map((c) => [c.id, c.relation]))
 
@@ -72,6 +79,7 @@ function ChatRoom({ roomId, characters, animateFirst }) {
   }
 
   async function handleSend() {
+    if (photoFile) return handleSendPhoto()
     const text = input.trim()
     if (!text || sending) return
     setMessages((prev) => [...prev, {
@@ -86,6 +94,58 @@ function ChatRoom({ roomId, characters, animateFirst }) {
         method: 'POST',
         body: JSON.stringify({ content: text }),
       })
+      await revealReplies(replies)
+    } catch (e) {
+      setError(e.message)
+      setTyping(false)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0]
+    e.target.value = '' // 같은 파일을 다시 선택해도 onChange가 발생하도록 초기화
+    if (!file) return
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setError('png, jpg, webp 파일만 보낼 수 있습니다.')
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setError('5MB 이하 파일만 보낼 수 있습니다.')
+      return
+    }
+    setError(null)
+    setPhotoFile(file)
+    setPhotoPreviewUrl(URL.createObjectURL(file))
+    setPhotoCaption('')
+  }
+
+  function handleCancelPhoto() {
+    setPhotoFile(null)
+    setPhotoPreviewUrl(null)
+    setPhotoCaption('')
+  }
+
+  async function handleSendPhoto() {
+    if (!photoFile || sending) return
+    const file = photoFile
+    const caption = photoCaption.trim()
+    setMessages((prev) => [...prev, {
+      id: `temp-${Date.now()}`, sender: '나', sender_character_id: null,
+      type: 'photo', image_path: photoPreviewUrl, caption: caption || null,
+    }])
+    setPhotoFile(null)
+    setPhotoPreviewUrl(null)
+    setPhotoCaption('')
+    setSending(true)
+    setError(null)
+    setTyping(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('caption', caption)
+      const replies = await apiRequest(`/rooms/${roomId}/photo`, { method: 'POST', body: formData })
       await revealReplies(replies)
     } catch (e) {
       setError(e.message)
@@ -151,19 +211,62 @@ function ChatRoom({ roomId, characters, animateFirst }) {
         <div ref={bottomRef} />
       </div>
       {room.includes_me && (
-        <div className="chat-room-input-bar">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSend() }}
-            placeholder="메시지 보내기"
-            disabled={sending}
-          />
-          <button type="button" className="btn-primary" onClick={handleSend} disabled={sending || !input.trim()}>
-            전송
-          </button>
-        </div>
+        <>
+          {photoFile && (
+            <div className="chat-room-photo-preview">
+              <img src={photoPreviewUrl} alt="첨부한 사진 미리보기" className="chat-room-photo-preview-thumb" />
+              <input
+                type="text"
+                className="chat-room-photo-preview-caption"
+                value={photoCaption}
+                onChange={(e) => setPhotoCaption(e.target.value)}
+                placeholder="캡션 (선택)"
+                disabled={sending}
+              />
+              <button
+                type="button"
+                className="chat-room-photo-preview-cancel"
+                onClick={handleCancelPhoto}
+                disabled={sending}
+              >
+                ×
+              </button>
+            </div>
+          )}
+          <div className="chat-room-input-bar">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              hidden
+            />
+            <button
+              type="button"
+              className="chat-room-attach-button"
+              onClick={() => fileInputRef.current.click()}
+              disabled={sending}
+            >
+              📷
+            </button>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSend() }}
+              placeholder={photoFile ? '사진을 보낼 준비가 됐어요' : '메시지 보내기'}
+              disabled={sending || !!photoFile}
+            />
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleSend}
+              disabled={sending || (photoFile ? false : !input.trim())}
+            >
+              전송
+            </button>
+          </div>
+        </>
       )}
     </div>
   )

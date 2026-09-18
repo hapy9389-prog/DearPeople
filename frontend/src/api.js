@@ -1,8 +1,9 @@
 const BASE = '/api'
 
 export async function apiRequest(path, options = {}) {
+  const isFormData = options.body instanceof FormData
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: isFormData ? {} : { 'Content-Type': 'application/json' },
     ...options,
   })
   if (!res.ok) {
