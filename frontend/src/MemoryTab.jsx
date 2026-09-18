@@ -80,8 +80,7 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
 
   return (
     <div className="memory-tab">
-      <div className="field">
-        <label>사람 선택</label>
+      <div className="memory-character-select">
         <select
           value={selectedCharacterId ?? ''}
           onChange={(e) => onSelectCharacter(Number(e.target.value))}
