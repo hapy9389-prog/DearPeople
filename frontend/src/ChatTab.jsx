@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { apiRequest } from './api'
+import { relationEmoji, avatarColor, formatTime } from './format'
 import ChatRoom from './ChatRoom'
 
-function ChatTab({ roomBadges, setRoomBadges }) {
+function ChatTab({ roomBadges, setRoomBadges, characters, openRoom, setOpenRoom }) {
   const [rooms, setRooms] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [selectedRoomId, setSelectedRoomId] = useState(null)
   const [ticking, setTicking] = useState(false)
   const [tickError, setTickError] = useState(null)
+  const prevOpenRoomIdRef = useRef(null)
+
+  const relationByName = Object.fromEntries(characters.map((c) => [c.name, c.relation]))
 
   function loadRooms(silent = false) {
     if (!silent) setLoading(true)
@@ -24,12 +27,17 @@ function ChatTab({ roomBadges, setRoomBadges }) {
     loadRooms()
   }, [])
 
-  function handleEnterRoom(roomId) {
-    setSelectedRoomId(roomId)
+  useEffect(() => {
+    if (prevOpenRoomIdRef.current !== null && openRoom === null) loadRooms(true)
+    prevOpenRoomIdRef.current = openRoom ? openRoom.id : null
+  }, [openRoom])
+
+  function handleEnterRoom(room) {
+    setOpenRoom({ id: room.id, name: room.name })
     setRoomBadges((prev) => {
-      if (!(roomId in prev)) return prev
+      if (!(room.id in prev)) return prev
       const next = { ...prev }
-      delete next[roomId]
+      delete next[room.id]
       return next
     })
   }
@@ -54,12 +62,9 @@ function ChatTab({ roomBadges, setRoomBadges }) {
     }
   }
 
-  if (selectedRoomId !== null) {
+  if (openRoom !== null) {
     return (
-      <ChatRoom
-        roomId={selectedRoomId}
-        onBack={() => { setSelectedRoomId(null); loadRooms() }}
-      />
+      <ChatRoom roomId={openRoom.id} characters={characters} />
     )
   }
 
@@ -74,18 +79,34 @@ function ChatTab({ roomBadges, setRoomBadges }) {
       {tickError && <div className="error-banner">{tickError}</div>}
       <ul className="room-list">
         {rooms.map((room) => (
-          <li key={room.id} className="room-item" onClick={() => handleEnterRoom(room.id)}>
-            <div className="room-item-header">
+          <li
+            key={room.id}
+            className={`room-item${!room.includes_me ? ' room-item-peek' : ''}`}
+            onClick={() => handleEnterRoom(room)}
+          >
+            <div className="room-item-avatars">
+              {room.members.slice(0, 3).map((name, idx) => (
+                <div key={name + idx} className="avatar avatar-small" style={{ background: avatarColor(name) }}>
+                  {relationEmoji(relationByName[name])}
+                </div>
+              ))}
+            </div>
+            <div className="room-item-body">
               <span className="room-item-name">{room.name}</span>
+              <div className="room-item-last">
+                {room.last_message
+                  ? `${room.last_message.sender}: ${room.last_message.content}`
+                  : '대화 없음'}
+              </div>
+            </div>
+            <div className="room-item-meta">
+              {room.last_message && (
+                <span className="room-item-time">{formatTime(room.last_message.created_at)}</span>
+              )}
               {!room.includes_me && <span className="room-item-badge">엿보기</span>}
               {roomBadges[room.id] > 0 && (
                 <span className="room-item-new-badge">{roomBadges[room.id]}</span>
               )}
-            </div>
-            <div className="room-item-last">
-              {room.last_message
-                ? `${room.last_message.sender}: ${room.last_message.content}`
-                : '대화 없음'}
             </div>
           </li>
         ))}

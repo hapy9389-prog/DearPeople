@@ -199,7 +199,7 @@ def list_rooms():
                 (r["id"],),
             ).fetchall()
             last = conn.execute(
-                "SELECT m.content, c.name AS sender_name FROM messages m "
+                "SELECT m.content, m.created_at, c.name AS sender_name FROM messages m "
                 "LEFT JOIN characters c ON c.id = m.sender_character_id "
                 "WHERE m.room_id = ? ORDER BY m.id DESC LIMIT 1",
                 (r["id"],),
@@ -209,6 +209,7 @@ def list_rooms():
                 last_message = {
                     "content": last["content"],
                     "sender": last["sender_name"] if last["sender_name"] else "나",
+                    "created_at": last["created_at"],
                 }
             result.append({
                 "id": r["id"],

@@ -32,6 +32,16 @@ class SettingsMeRequest(BaseModel):
     name: str
 
 
+@app.get("/api/settings/me")
+def get_my_name():
+    conn = get_connection()
+    try:
+        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
+    finally:
+        conn.close()
+    return {"name": me_row["value"] if me_row else "나"}
+
+
 @app.put("/api/settings/me")
 def set_my_name(body: SettingsMeRequest):
     conn = get_connection()

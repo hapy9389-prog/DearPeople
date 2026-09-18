@@ -1,11 +1,34 @@
 import { useState, useEffect, useRef } from 'react'
 import { apiRequest } from './api'
+import { relationEmoji, avatarColor, formatTime, formatDateDivider, kstDateKey, kstMinuteKey } from './format'
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function ChatRoom({ roomId, onBack }) {
+function withDisplayFlags(messages) {
+  let prevSenderId, prevDateKey
+  return messages.map((m, i) => {
+    const dateKey = kstDateKey(m.created_at)
+    const showDateDivider = dateKey !== prevDateKey
+    const isFirstOfRun = m.sender_character_id !== prevSenderId || showDateDivider
+    const next = messages[i + 1]
+    const sameRunAsNext = next
+      && next.sender_character_id === m.sender_character_id
+      && kstDateKey(next.created_at) === dateKey
+      && kstMinuteKey(next.created_at) === kstMinuteKey(m.created_at)
+    prevSenderId = m.sender_character_id
+    prevDateKey = dateKey
+    return {
+      ...m,
+      showDateDivider,
+      showAvatar: isFirstOfRun && m.sender_character_id !== null,
+      showTimestamp: !sameRunAsNext,
+    }
+  })
+}
+
+function ChatRoom({ roomId, characters }) {
   const [room, setRoom] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -14,6 +37,8 @@ function ChatRoom({ roomId, onBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const bottomRef = useRef(null)
+
+  const relationById = Object.fromEntries(characters.map((c) => [c.id, c.relation]))
 
   useEffect(() => {
     apiRequest(`/rooms/${roomId}/messages`)
@@ -67,17 +92,37 @@ function ChatRoom({ roomId, onBack }) {
 
   return (
     <div className="chat-room">
-      <div className="chat-room-header">
-        <button type="button" className="chat-room-back" onClick={onBack}>‹</button>
-        <span className="chat-room-title">{room.name}</span>
-      </div>
       {!room.includes_me && <div className="peek-banner">엿보는 중</div>}
       {error && <div className="error-banner">{error}</div>}
       <div className="chat-room-messages">
-        {messages.map((m) => (
-          <div key={m.id} className={`bubble-row${m.sender_character_id === null ? ' mine' : ''}`}>
-            {m.sender_character_id !== null && <div className="bubble-sender">{m.sender}</div>}
-            <div className="bubble">{m.content}</div>
+        {withDisplayFlags(messages).map((m) => (
+          <div key={m.id} className="message-block">
+            {m.showDateDivider && (
+              <div className="chat-date-divider"><span>{formatDateDivider(m.created_at)}</span></div>
+            )}
+            <div className={`bubble-row${m.sender_character_id === null ? ' mine' : ''}`}>
+              {m.sender_character_id !== null && (
+                m.showAvatar
+                  ? (
+                    <div className="avatar" style={{ background: avatarColor(m.sender) }}>
+                      {relationEmoji(relationById[m.sender_character_id])}
+                    </div>
+                  )
+                  : <div className="avatar avatar-spacer" />
+              )}
+              <div className="bubble-content">
+                {m.showAvatar && <div className="bubble-sender">{m.sender}</div>}
+                <div className="bubble-line">
+                  {m.sender_character_id === null && m.showTimestamp && (
+                    <span className="bubble-time">{formatTime(m.created_at)}</span>
+                  )}
+                  <div className="bubble">{m.content}</div>
+                  {m.sender_character_id !== null && m.showTimestamp && (
+                    <span className="bubble-time">{formatTime(m.created_at)}</span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         ))}
         {typing && (
