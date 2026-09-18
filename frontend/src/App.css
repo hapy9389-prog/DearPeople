@@ -1087,6 +1087,29 @@ body {
   font-weight: 500;
 }
 
+.memory-suggest-bar {
+  flex-shrink: 0;
+  padding: 0 var(--pad-screen) var(--gap-related);
+}
+
+.memory-suggest-button {
+  width: 100%;
+  padding: 10px;
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  background: none;
+  color: var(--accent);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.memory-suggest-button:disabled {
+  border-color: var(--line);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
 .memory-tab-body {
   flex: 1;
   min-height: 0;
@@ -1098,6 +1121,47 @@ body {
   margin-left: var(--pad-screen);
   margin-right: var(--pad-screen);
   margin-top: var(--gap-related);
+}
+
+.memory-suggestion-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--pad-screen) var(--gap-related);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memory-suggestion-card {
+  background: var(--accent-soft);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-related);
+}
+
+.memory-suggestion-character {
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.memory-suggestion-content {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: var(--fs-body);
+  font-family: inherit;
+  color: var(--text);
+  resize: none;
+}
+
+.memory-suggestion-content:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .memory-card-list {

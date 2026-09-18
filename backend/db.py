@@ -75,6 +75,16 @@ def init_db() -> None:
             room_key TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS memory_suggestions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            profile_id INTEGER NOT NULL REFERENCES profiles(id),
+            character_id INTEGER NOT NULL REFERENCES characters(id),
+            content TEXT NOT NULL,
+            source_room_id INTEGER NOT NULL REFERENCES rooms(id),
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            status TEXT NOT NULL DEFAULT 'pending'
+        );
         """
     )
     existing_cols = [row["name"] for row in conn.execute("PRAGMA table_info(messages)").fetchall()]
@@ -171,6 +181,7 @@ def clear_profile_data(profile_id: int) -> None:
             "DELETE FROM memories WHERE character_id IN (SELECT id FROM characters WHERE profile_id = ?)",
             (profile_id,),
         )
+        conn.execute("DELETE FROM memory_suggestions WHERE profile_id = ?", (profile_id,))
         conn.execute("DELETE FROM rooms WHERE profile_id = ?", (profile_id,))
         conn.execute("DELETE FROM characters WHERE profile_id = ?", (profile_id,))
         conn.execute("DELETE FROM deleted_rooms WHERE profile_id = ?", (profile_id,))

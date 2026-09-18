@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from db import clear_profile_data, get_connection, get_current_profile_id, init_db
 from routes_characters import router as characters_router
+from routes_memory_suggestions import router as memory_suggestions_router
 from routes_messages import router as messages_router
 from routes_profiles import router as profiles_router
 from routes_rooms import router as rooms_router
@@ -25,6 +26,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.include_router(characters_router)
+app.include_router(memory_suggestions_router)
 app.include_router(rooms_router)
 app.include_router(messages_router)
 app.include_router(tick_router)

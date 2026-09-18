@@ -13,6 +13,8 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
   const [menuOpenId, setMenuOpenId] = useState(null)
   const [newMemoryText, setNewMemoryText] = useState('')
   const [toast, setToast] = useState(null)
+  const [suggestions, setSuggestions] = useState([])
+  const [finding, setFinding] = useState(false)
 
   useEffect(() => {
     apiRequest('/characters')
@@ -22,6 +24,12 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
           onSelectCharacter(chars[0].id)
         }
       })
+      .catch((e) => setError(e.message))
+  }, [])
+
+  useEffect(() => {
+    apiRequest('/memories/suggestions')
+      .then(setSuggestions)
       .catch((e) => setError(e.message))
   }, [])
 
@@ -83,6 +91,49 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
     }
   }
 
+  async function handleFindSuggestions() {
+    setFinding(true)
+    try {
+      const created = await apiRequest('/memories/suggest', { method: 'POST' })
+      setSuggestions((prev) => [...prev, ...created])
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setFinding(false)
+    }
+  }
+
+  function handleSuggestionEdit(id, value) {
+    setSuggestions((prev) => prev.map((s) => (s.id === id ? { ...s, content: value } : s)))
+  }
+
+  async function handleAcceptSuggestion(suggestion) {
+    const content = suggestion.content.trim()
+    if (!content) return
+    try {
+      const memory = await apiRequest(`/memories/suggestions/${suggestion.id}/accept`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      })
+      setSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id))
+      if (suggestion.character_id === selectedCharacterId) {
+        setMemories((prev) => [...prev, memory])
+      }
+      showToast()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function handleRejectSuggestion(id) {
+    try {
+      await apiRequest(`/memories/suggestions/${id}/reject`, { method: 'POST' })
+      setSuggestions((prev) => prev.filter((s) => s.id !== id))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   return (
     <div className="memory-tab">
       <div className="memory-character-strip">
@@ -101,9 +152,48 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
         ))}
       </div>
 
+      <div className="memory-suggest-bar">
+        <button
+          type="button"
+          className="memory-suggest-button"
+          onClick={handleFindSuggestions}
+          disabled={finding}
+        >
+          {finding ? '찾는 중...' : '대화에서 찾기'}
+        </button>
+      </div>
+
       <div className="memory-tab-body">
         {error && <div className="error-banner">{error}</div>}
         {toast && <div className="toast">{toast}</div>}
+
+        {suggestions.length > 0 && (
+          <ul className="memory-suggestion-list">
+            {suggestions.map((s) => (
+              <li key={s.id} className="memory-suggestion-card">
+                <div className="memory-suggestion-character">{s.character_name}</div>
+                <textarea
+                  className="memory-suggestion-content"
+                  rows={2}
+                  value={s.content}
+                  onChange={(e) => handleSuggestionEdit(s.id, e.target.value)}
+                />
+                <div className="character-form-actions">
+                  <button type="button" className="btn-primary" onClick={() => handleAcceptSuggestion(s)}>
+                    추가
+                  </button>
+                  <button
+                    type="button"
+                    className="character-form-secondary-button"
+                    onClick={() => handleRejectSuggestion(s.id)}
+                  >
+                    무시
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {loading ? (
           <div className="placeholder">불러오는 중...</div>
