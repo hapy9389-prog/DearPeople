@@ -35,12 +35,12 @@ def build_room_plan(characters):
     if len(family) >= 2:
         family_ids = [c["id"] for c in family]
         plan.append({"name": "우리 가족", "type": "group", "includes_me": 1, "member_ids": family_ids})
-        plan.append({"name": "나 빼고 가족방", "type": "group", "includes_me": 0, "member_ids": family_ids})
+        plan.append({"name": "가족들끼리", "type": "group", "includes_me": 0, "member_ids": family_ids})
 
-    # elif 아님: 부모님방은 가족방들과 별개로 추가 생성된다.
+    # elif 아님: "엄마와 아빠" 방은 가족방들과 별개로 추가 생성된다.
     if "엄마" in by_relation and "아빠" in by_relation:
         plan.append({
-            "name": "부모님방", "type": "group", "includes_me": 0,
+            "name": "엄마와 아빠", "type": "group", "includes_me": 0,
             "member_ids": [by_relation["엄마"], by_relation["아빠"]],
         })
 

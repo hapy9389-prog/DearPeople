@@ -29,7 +29,7 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
   const [expandedId, setExpandedId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [addingCharacter, setAddingCharacter] = useState(false)
+  const [characterSheetOpen, setCharacterSheetOpen] = useState(false)
   const [needsRoomRegen, setNeedsRoomRegen] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
   const [regenerateError, setRegenerateError] = useState(null)
@@ -60,7 +60,7 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
   }, [])
 
   function handleCharacterSaved() {
-    setAddingCharacter(false)
+    setCharacterSheetOpen(false)
     setNeedsRoomRegen(true)
     loadCharacters()
     onCharactersChanged()
@@ -133,12 +133,6 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
     <div className="people-tab">
       {toast && <div className="toast">{toast}</div>}
 
-      {addingCharacter && (
-        <div className="people-add-form">
-          <CharacterForm onSaved={handleCharacterSaved} />
-        </div>
-      )}
-
       {needsRoomRegen && (
         <div className="people-regen-banner">
           {regenerating ? (
@@ -159,21 +153,21 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
         <RelationshipDiagram profile={profile} characters={characters} onOpenMemories={onOpenMemories} />
       )}
 
-      {characters.length === 0 && !addingCharacter ? (
+      {characters.length === 0 ? (
         <div className="empty-state">
           <PeopleIcon className="empty-state-icon" size={48} />
           <div className="empty-state-text">아직 만든 사람이 없어요</div>
-          <button type="button" className="btn-primary" onClick={() => setAddingCharacter(true)}>캐릭터 추가</button>
+          <button type="button" className="btn-primary" onClick={() => setCharacterSheetOpen(true)}>캐릭터 추가</button>
         </div>
       ) : (
       <>
         <button
           type="button"
           className="people-add-character-button"
-          onClick={() => setAddingCharacter((v) => !v)}
+          onClick={() => setCharacterSheetOpen(true)}
         >
           <PlusIcon size={16} />
-          <span>{addingCharacter ? '취소' : '캐릭터 추가'}</span>
+          <span>캐릭터 추가</span>
         </button>
         <ul className="people-list">
         {characters.map((c) => {
@@ -323,6 +317,14 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
         })}
         </ul>
       </>
+      )}
+
+      {characterSheetOpen && (
+        <CharacterForm
+          sheet
+          onClose={() => setCharacterSheetOpen(false)}
+          onSaved={handleCharacterSaved}
+        />
       )}
     </div>
   )

@@ -101,6 +101,13 @@ def init_db() -> None:
     if "reaction_style" not in char_cols2:
         conn.execute("ALTER TABLE characters ADD COLUMN reaction_style TEXT NOT NULL DEFAULT ''")
 
+    # 1회성 백필: 자동 생성 방 이름 변경("나 빼고 가족방"→"가족들끼리", "부모님방"→"엄마와 아빠").
+    # 이미 바뀐 행은 WHERE 조건에 걸리지 않으므로 여러 번 실행해도 안전하다.
+    conn.execute("UPDATE rooms SET name = '가족들끼리' WHERE name = '나 빼고 가족방'")
+    conn.execute("UPDATE rooms SET name = '엄마와 아빠' WHERE name = '부모님방'")
+    conn.execute("UPDATE deleted_rooms SET room_key = '가족들끼리' WHERE room_key = '나 빼고 가족방'")
+    conn.execute("UPDATE deleted_rooms SET room_key = '엄마와 아빠' WHERE room_key = '부모님방'")
+
     # 기존 데이터 보존용 1회성 백필: profiles가 비어있고 characters에 데이터가 있으면
     # me_name으로 프로필 하나를 만들어 기존 캐릭터·방을 모두 그 프로필에 연결한다.
     profile_count = conn.execute("SELECT COUNT(*) AS n FROM profiles").fetchone()["n"]
