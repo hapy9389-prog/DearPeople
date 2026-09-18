@@ -113,6 +113,41 @@ def list_characters():
         conn.close()
 
 
+class CharacterUpdateRequest(BaseModel):
+    name: str
+    relation: str
+    grp: str
+    personality: str
+    speech_style: str
+    calls_me: str
+
+
+@router.put("/api/characters/{character_id}")
+def update_character(character_id: int, body: CharacterUpdateRequest):
+    if not body.name.strip() or not body.relation.strip():
+        raise HTTPException(status_code=400, detail="이름과 관계를 입력해주세요.")
+    conn = get_connection()
+    try:
+        owned = conn.execute(
+            "SELECT 1 FROM characters WHERE id = ? AND profile_id = ?",
+            (character_id, get_current_profile_id(conn)),
+        ).fetchone()
+        if not owned:
+            raise HTTPException(status_code=404, detail="캐릭터를 찾을 수 없습니다.")
+        conn.execute(
+            "UPDATE characters SET name = ?, relation = ?, grp = ?, personality = ?, "
+            "speech_style = ?, calls_me = ? WHERE id = ?",
+            (
+                body.name.strip(), body.relation.strip(), body.grp,
+                body.personality, body.speech_style, body.calls_me, character_id,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}
+
+
 @router.delete("/api/characters/{character_id}")
 def delete_character(character_id: int):
     conn = get_connection()

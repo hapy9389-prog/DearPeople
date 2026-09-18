@@ -1,26 +1,9 @@
 import { useState } from 'react'
 import { apiRequest } from './api'
-
-const RELATION_TO_GRP = {
-  엄마: 'family',
-  아빠: 'family',
-  형제자매: 'family',
-  친구: 'friend',
-}
+import { resolveRelationAndGrp, isRelationValid } from './relation'
 
 const EMPTY_FORM = {
   relationOption: '엄마', customRelation: '', customGrp: 'family', name: '', description: '',
-}
-
-function resolveRelationAndGrp(form) {
-  if (form.relationOption === '기타') {
-    return { relation: form.customRelation.trim(), grp: form.customGrp }
-  }
-  return { relation: form.relationOption, grp: RELATION_TO_GRP[form.relationOption] }
-}
-
-function isRelationValid(form) {
-  return form.relationOption !== '기타' || form.customRelation.trim().length > 0
 }
 
 function CharacterForm({ onSaved }) {
@@ -155,16 +138,16 @@ function CharacterForm({ onSaved }) {
         <>
           <div className="field">
             <label>성격</label>
-            <input
-              type="text"
+            <textarea
+              rows={3}
               value={draft.personality}
               onChange={(e) => updateDraftField('personality', e.target.value)}
             />
           </div>
           <div className="field">
             <label>말투</label>
-            <input
-              type="text"
+            <textarea
+              rows={3}
               value={draft.speech_style}
               onChange={(e) => updateDraftField('speech_style', e.target.value)}
             />
