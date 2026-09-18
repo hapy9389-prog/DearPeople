@@ -3,13 +3,17 @@ import { apiRequest } from './api'
 import { relationEmoji, avatarColor, formatTime } from './format'
 import ChatRoom from './ChatRoom'
 
-function ChatTab({ roomBadges, setRoomBadges, characters, openRoom, setOpenRoom }) {
+function ChatTab({
+  roomBadges, setRoomBadges, characters, openRoom, setOpenRoom,
+  autoTickEnabled, onToggleAutoTick, tickVersion,
+}) {
   const [rooms, setRooms] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [ticking, setTicking] = useState(false)
   const [tickError, setTickError] = useState(null)
   const prevOpenRoomIdRef = useRef(null)
+  const prevTickVersionRef = useRef(tickVersion)
 
   const relationByName = Object.fromEntries(characters.map((c) => [c.name, c.relation]))
 
@@ -31,6 +35,13 @@ function ChatTab({ roomBadges, setRoomBadges, characters, openRoom, setOpenRoom 
     if (prevOpenRoomIdRef.current !== null && openRoom === null) loadRooms(true)
     prevOpenRoomIdRef.current = openRoom ? openRoom.id : null
   }, [openRoom])
+
+  useEffect(() => {
+    if (tickVersion !== prevTickVersionRef.current) {
+      loadRooms(true) // 자동 시간 흐르기 결과 반영 (깜빡임 없이 조용히 갱신)
+      prevTickVersionRef.current = tickVersion
+    }
+  }, [tickVersion])
 
   function handleEnterRoom(room) {
     setOpenRoom({ id: room.id, name: room.name })
@@ -73,9 +84,20 @@ function ChatTab({ roomBadges, setRoomBadges, characters, openRoom, setOpenRoom 
 
   return (
     <div className="chat-tab">
-      <button type="button" className="btn-primary tick-button" onClick={handleTick} disabled={ticking}>
-        {ticking ? '시간이 흐르는 중...' : '시간 흐르기'}
-      </button>
+      <div className="tick-row">
+        <label className="auto-tick-toggle">
+          <input
+            type="checkbox"
+            checked={autoTickEnabled}
+            onChange={(e) => onToggleAutoTick(e.target.checked)}
+          />
+          <span className="auto-tick-switch" />
+          <span>자동 시간 흐르기</span>
+        </label>
+        <button type="button" className="btn-primary tick-button" onClick={handleTick} disabled={ticking}>
+          {ticking ? '시간이 흐르는 중...' : '시간 흐르기'}
+        </button>
+      </div>
       {tickError && <div className="error-banner">{tickError}</div>}
       <ul className="room-list">
         {rooms.map((room) => (

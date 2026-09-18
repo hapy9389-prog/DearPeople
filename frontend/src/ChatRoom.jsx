@@ -101,26 +101,22 @@ function ChatRoom({ roomId, characters }) {
               <div className="chat-date-divider"><span>{formatDateDivider(m.created_at)}</span></div>
             )}
             <div className={`bubble-row${m.sender_character_id === null ? ' mine' : ''}`}>
-              {m.sender_character_id !== null && (
-                m.showAvatar
-                  ? (
-                    <div className="avatar" style={{ background: avatarColor(m.sender) }}>
-                      {relationEmoji(relationById[m.sender_character_id])}
-                    </div>
-                  )
-                  : <div className="avatar avatar-spacer" />
-              )}
-              <div className="bubble-content">
-                {m.showAvatar && <div className="bubble-sender">{m.sender}</div>}
-                <div className="bubble-line">
-                  {m.sender_character_id === null && m.showTimestamp && (
-                    <span className="bubble-time">{formatTime(m.created_at)}</span>
-                  )}
-                  <div className="bubble">{m.content}</div>
-                  {m.sender_character_id !== null && m.showTimestamp && (
-                    <span className="bubble-time">{formatTime(m.created_at)}</span>
-                  )}
+              {m.sender_character_id !== null && m.showAvatar && (
+                <div className="bubble-header">
+                  <div className="avatar avatar-small" style={{ background: avatarColor(m.sender) }}>
+                    {relationEmoji(relationById[m.sender_character_id])}
+                  </div>
+                  <span className="bubble-sender">{m.sender}</span>
                 </div>
+              )}
+              <div className={`bubble-line${m.sender_character_id !== null ? ' bubble-line-indent' : ''}`}>
+                {m.sender_character_id === null && m.showTimestamp && (
+                  <span className="bubble-time">{formatTime(m.created_at)}</span>
+                )}
+                <div className="bubble">{m.content}</div>
+                {m.sender_character_id !== null && m.showTimestamp && (
+                  <span className="bubble-time">{formatTime(m.created_at)}</span>
+                )}
               </div>
             </div>
           </div>
