@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import Onboarding from './Onboarding'
 import ChatTab from './ChatTab'
+import PeopleTab from './PeopleTab'
+import MemoryTab from './MemoryTab'
 import { apiRequest } from './api'
 
 const TABS = [
@@ -13,6 +15,12 @@ function App() {
   const [phase, setPhase] = useState('loading')
   const [activeTab, setActiveTab] = useState('chat')
   const [roomBadges, setRoomBadges] = useState({})
+  const [memoryTabCharacterId, setMemoryTabCharacterId] = useState(null)
+
+  function openMemoriesForCharacter(characterId) {
+    setMemoryTabCharacterId(characterId)
+    setActiveTab('memory')
+  }
 
   useEffect(() => {
     apiRequest('/rooms')
@@ -38,8 +46,13 @@ function App() {
     <div className="app">
       <main className="screen">
         {activeTab === 'chat' && <ChatTab roomBadges={roomBadges} setRoomBadges={setRoomBadges} />}
-        {activeTab === 'people' && <div className="placeholder">사람 화면</div>}
-        {activeTab === 'memory' && <div className="placeholder">기억 화면</div>}
+        {activeTab === 'people' && <PeopleTab onOpenMemories={openMemoriesForCharacter} />}
+        {activeTab === 'memory' && (
+          <MemoryTab
+            selectedCharacterId={memoryTabCharacterId}
+            onSelectCharacter={setMemoryTabCharacterId}
+          />
+        )}
       </main>
       <nav className="tab-bar">
         {TABS.map((tab) => (

@@ -123,3 +123,81 @@ def delete_character(character_id: int):
     if cur.rowcount == 0:
         raise HTTPException(status_code=404, detail="캐릭터를 찾을 수 없습니다.")
     return {"ok": True}
+
+
+class MemoryRequest(BaseModel):
+    content: str
+
+
+@router.get("/api/characters/{character_id}/memories")
+def list_memories(character_id: int):
+    conn = get_connection()
+    try:
+        character = conn.execute(
+            "SELECT id FROM characters WHERE id = ?", (character_id,)
+        ).fetchone()
+        if character is None:
+            raise HTTPException(status_code=404, detail="캐릭터를 찾을 수 없습니다.")
+        rows = conn.execute(
+            "SELECT id, character_id, content, created_at FROM memories "
+            "WHERE character_id = ? ORDER BY id",
+            (character_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@router.post("/api/characters/{character_id}/memories")
+def create_memory(character_id: int, body: MemoryRequest):
+    if not body.content.strip():
+        raise HTTPException(status_code=400, detail="내용을 입력해주세요.")
+    conn = get_connection()
+    try:
+        character = conn.execute(
+            "SELECT id FROM characters WHERE id = ?", (character_id,)
+        ).fetchone()
+        if character is None:
+            raise HTTPException(status_code=404, detail="캐릭터를 찾을 수 없습니다.")
+        cur = conn.execute(
+            "INSERT INTO memories (character_id, content) VALUES (?, ?)",
+            (character_id, body.content.strip()),
+        )
+        conn.commit()
+        memory_id = cur.lastrowid
+    finally:
+        conn.close()
+    return {"id": memory_id, "character_id": character_id, "content": body.content.strip()}
+
+
+@router.put("/api/memories/{memory_id}")
+def update_memory(memory_id: int, body: MemoryRequest):
+    if not body.content.strip():
+        raise HTTPException(status_code=400, detail="내용을 입력해주세요.")
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "UPDATE memories SET content = ? WHERE id = ?",
+            (body.content.strip(), memory_id),
+        )
+        conn.commit()
+        found = cur.rowcount > 0
+    finally:
+        conn.close()
+    if not found:
+        raise HTTPException(status_code=404, detail="기억을 찾을 수 없습니다.")
+    return {"id": memory_id, "content": body.content.strip()}
+
+
+@router.delete("/api/memories/{memory_id}")
+def delete_memory(memory_id: int):
+    conn = get_connection()
+    try:
+        cur = conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+        conn.commit()
+        found = cur.rowcount > 0
+    finally:
+        conn.close()
+    if not found:
+        raise HTTPException(status_code=404, detail="기억을 찾을 수 없습니다.")
+    return {"ok": True}
