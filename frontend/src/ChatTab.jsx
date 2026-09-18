@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { apiRequest } from './api'
 import { relationEmoji, avatarColor, formatTime } from './format'
 import ChatRoom from './ChatRoom'
+import RoomCreateSheet from './RoomCreateSheet'
 
 function ChatTab({
   roomBadges, setRoomBadges, characters, openRoom, setOpenRoom,
@@ -12,6 +13,7 @@ function ChatTab({
   const [loading, setLoading] = useState(true)
   const [ticking, setTicking] = useState(false)
   const [tickError, setTickError] = useState(null)
+  const [roomCreateOpen, setRoomCreateOpen] = useState(false)
   const prevOpenRoomIdRef = useRef(null)
   const prevTickVersionRef = useRef(tickVersion)
 
@@ -44,13 +46,18 @@ function ChatTab({
   }, [tickVersion])
 
   function handleEnterRoom(room) {
-    setOpenRoom({ id: room.id, name: room.name })
+    setOpenRoom({ id: room.id, name: room.name, is_custom: room.is_custom })
     setRoomBadges((prev) => {
       if (!(room.id in prev)) return prev
       const next = { ...prev }
       delete next[room.id]
       return next
     })
+  }
+
+  function handleRoomCreated(room) {
+    setRoomCreateOpen(false)
+    setOpenRoom({ id: room.id, name: room.name, is_custom: true, justCreated: true })
   }
 
   async function handleTick() {
@@ -75,7 +82,7 @@ function ChatTab({
 
   if (openRoom !== null) {
     return (
-      <ChatRoom roomId={openRoom.id} characters={characters} />
+      <ChatRoom roomId={openRoom.id} characters={characters} animateFirst={!!openRoom.justCreated} />
     )
   }
 
@@ -103,6 +110,16 @@ function ChatTab({
           ? '대화가 자동으로 이어지는 중입니다.'
           : '자동 시간 흐르기를 켜면 대화가 계속 이어집니다.'}
       </div>
+      <div className="room-create-bar">
+        <button type="button" className="btn-primary" onClick={() => setRoomCreateOpen(true)}>방 만들기</button>
+      </div>
+      {roomCreateOpen && (
+        <RoomCreateSheet
+          characters={characters}
+          onClose={() => setRoomCreateOpen(false)}
+          onCreated={handleRoomCreated}
+        />
+      )}
       {tickError && <div className="error-banner">{tickError}</div>}
       <ul className="room-list">
         {rooms.map((room) => (
@@ -131,6 +148,7 @@ function ChatTab({
                 <span className="room-item-time">{formatTime(room.last_message.created_at)}</span>
               )}
               {!room.includes_me && <span className="room-item-badge">엿보기</span>}
+              {room.is_custom && <span className="room-item-badge">직접 생성</span>}
               {roomBadges[room.id] > 0 && (
                 <span className="room-item-new-badge">{roomBadges[room.id]}</span>
               )}

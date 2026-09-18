@@ -1,8 +1,10 @@
 import concurrent.futures
 import logging
 import os
+from typing import List
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from ai import call_claude_json
 from db import get_connection, get_current_profile_id
@@ -53,7 +55,7 @@ def build_room_plan(characters):
     return plan
 
 
-def build_room_message_prompt(conn, room, members, my_name):
+def build_room_message_prompt(conn, room, members, my_name, is_new_room=False):
     participants_block = "\n".join(build_character_description(conn, m) for m in members)
 
     if room["type"] == "dm":
@@ -71,10 +73,25 @@ def build_room_message_prompt(conn, room, members, my_name):
     else:
         me_instruction = f"이 대화방에는 사용자({my_name})가 없습니다. 참여자끼리만 대화하세요."
 
+    new_room_line = ""
+    if is_new_room:
+        if room["includes_me"]:
+            new_room_instruction = (
+                f"이 방은 방금 사용자({my_name})가 이 사람들을 한 방에 모아 새로 만든 방입니다. "
+                "'무슨 일이야?', '오랜만에 다 모였네' 같은 반응으로 대화를 시작하세요."
+            )
+        else:
+            new_room_instruction = (
+                "이 방은 참여자들이 방금 모인 새로운 방입니다. "
+                "서로 인사하거나 왜 모였는지 궁금해하는 반응으로 대화를 시작하세요."
+            )
+        new_room_line = f"{new_room_instruction} 이미 오래 대화해온 것처럼 쓰지 마세요.\n"
+
     system_prompt = (
         "당신은 모바일 채팅 앱 'DearPeople'의 대화 메시지를 생성하는 도우미입니다. "
         f"채팅방 이름은 '{room['name']}'이고 참여자는 다음과 같습니다.\n{participants_block}\n"
         f"{me_instruction}\n"
+        f"{new_room_line}"
         f"각 참여자의 성격, 말투, 추억을 반영해서 {count_instruction} "
         "같은 캐릭터가 3개 이상 연속으로 메시지를 보내지 않게 하세요. "
         "sender는 반드시 위 참여자 이름 중 하나여야 하며, 그 외의 이름(특히 사용자 이름)을 "
@@ -94,11 +111,13 @@ def resolve_sender(sender_name, member_name_to_id, my_name):
     return False, None
 
 
-def generate_room_messages(room, characters_by_id, my_name, chat_model):
+def generate_room_messages(room, characters_by_id, my_name, chat_model, is_new_room=False):
     members = [characters_by_id[cid] for cid in room["member_ids"]]
     conn = get_connection()
     try:
-        system_prompt, user_message = build_room_message_prompt(conn, room, members, my_name)
+        system_prompt, user_message = build_room_message_prompt(
+            conn, room, members, my_name, is_new_room
+        )
     finally:
         conn.close()
     msg_args = [{"role": "user", "content": user_message}]
@@ -127,6 +146,9 @@ def generate_rooms():
         profile_id = get_current_profile_id(conn)
         characters = fetch_characters(conn, profile_id)
         me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
+        deleted_rows = conn.execute(
+            "SELECT room_key FROM deleted_rooms WHERE profile_id = ?", (profile_id,)
+        ).fetchall()
     finally:
         conn.close()
 
@@ -134,7 +156,8 @@ def generate_rooms():
         raise HTTPException(status_code=400, detail="캐릭터가 없습니다. 먼저 캐릭터를 추가해주세요.")
 
     my_name = me_row["value"] if me_row else "나"
-    room_plan = build_room_plan(characters)
+    deleted_names = {row["room_key"] for row in deleted_rows}
+    room_plan = [r for r in build_room_plan(characters) if r["name"] not in deleted_names]
     characters_by_id = {c["id"]: c for c in characters}
     chat_model = os.environ.get("CHAT_MODEL")
 
@@ -162,14 +185,16 @@ def generate_rooms():
     conn = get_connection()
     try:
         conn.execute(
-            "DELETE FROM messages WHERE room_id IN (SELECT id FROM rooms WHERE profile_id = ?)",
+            "DELETE FROM messages WHERE room_id IN "
+            "(SELECT id FROM rooms WHERE profile_id = ? AND is_custom = 0)",
             (profile_id,),
         )
         conn.execute(
-            "DELETE FROM room_members WHERE room_id IN (SELECT id FROM rooms WHERE profile_id = ?)",
+            "DELETE FROM room_members WHERE room_id IN "
+            "(SELECT id FROM rooms WHERE profile_id = ? AND is_custom = 0)",
             (profile_id,),
         )
-        conn.execute("DELETE FROM rooms WHERE profile_id = ?", (profile_id,))
+        conn.execute("DELETE FROM rooms WHERE profile_id = ? AND is_custom = 0", (profile_id,))
 
         for entry in generated:
             plan = entry["plan"]
@@ -200,7 +225,7 @@ def list_rooms():
     conn = get_connection()
     try:
         rooms = conn.execute(
-            "SELECT id, name, type, includes_me FROM rooms WHERE profile_id = ? ORDER BY id",
+            "SELECT id, name, type, includes_me, is_custom FROM rooms WHERE profile_id = ? ORDER BY id",
             (get_current_profile_id(conn),),
         ).fetchall()
         result = []
@@ -228,9 +253,100 @@ def list_rooms():
                 "id": r["id"],
                 "name": r["name"],
                 "includes_me": bool(r["includes_me"]),
+                "is_custom": bool(r["is_custom"]),
                 "members": [m["name"] for m in members],
                 "last_message": last_message,
             })
         return result
     finally:
         conn.close()
+
+
+class RoomCreateRequest(BaseModel):
+    name: str = ""
+    member_ids: List[int]
+    includes_me: bool = True
+
+
+@router.post("/api/rooms")
+def create_room(body: RoomCreateRequest):
+    if not body.member_ids:
+        raise HTTPException(status_code=400, detail="멤버를 1명 이상 선택해주세요.")
+    conn = get_connection()
+    try:
+        profile_id = get_current_profile_id(conn)
+        characters = fetch_characters(conn, profile_id)
+        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
+    finally:
+        conn.close()
+
+    characters_by_id = {c["id"]: c for c in characters}
+    if any(mid not in characters_by_id for mid in body.member_ids):
+        raise HTTPException(status_code=400, detail="캐릭터를 찾을 수 없습니다.")
+
+    my_name = me_row["value"] if me_row else "나"
+    member_names = [characters_by_id[mid]["name"] for mid in body.member_ids]
+    room_name = body.name.strip() or ", ".join(member_names)
+    includes_me_flag = 1 if body.includes_me else 0
+    # type을 "group"으로 고정: build_room_message_prompt의 group 분기(나 있음 2~4개,
+    # 나 없음 3~5개)를 타게 해 멤버 수와 무관하게 "dm"의 1~2개보다 많은 대화가 생성되게 한다.
+    room_plan_entry = {
+        "name": room_name, "type": "group",
+        "includes_me": includes_me_flag, "member_ids": body.member_ids,
+    }
+    chat_model = os.environ.get("CHAT_MODEL")
+    result = generate_room_messages(
+        room_plan_entry, characters_by_id, my_name, chat_model, is_new_room=True
+    )
+
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "INSERT INTO rooms (profile_id, name, type, includes_me, is_custom) "
+            "VALUES (?, ?, 'group', ?, 1)",
+            (profile_id, room_name, includes_me_flag),
+        )
+        room_id = cur.lastrowid
+        for cid in body.member_ids:
+            conn.execute(
+                "INSERT INTO room_members (room_id, character_id) VALUES (?, ?)", (room_id, cid)
+            )
+        for msg in result["messages"]:
+            conn.execute(
+                "INSERT INTO messages (room_id, sender_character_id, type, content, caption, image_path) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    room_id, msg["sender_character_id"], msg.get("type", "text"),
+                    msg["content"], msg.get("caption"), msg.get("image_path"),
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"id": room_id, "name": room_name}
+
+
+@router.delete("/api/rooms/{room_id}")
+def delete_room(room_id: int):
+    conn = get_connection()
+    try:
+        profile_id = get_current_profile_id(conn)
+        room = conn.execute(
+            "SELECT id, name, is_custom FROM rooms WHERE id = ? AND profile_id = ?",
+            (room_id, profile_id),
+        ).fetchone()
+        if not room:
+            raise HTTPException(status_code=404, detail="방을 찾을 수 없습니다.")
+        conn.execute("DELETE FROM messages WHERE room_id = ?", (room_id,))
+        conn.execute("DELETE FROM room_members WHERE room_id = ?", (room_id,))
+        conn.execute("DELETE FROM rooms WHERE id = ?", (room_id,))
+        if not room["is_custom"]:
+            # 자동 생성 방만 기록 — "방 다시 만들기"가 같은 이름으로 되살리지 않게 한다.
+            conn.execute(
+                "INSERT INTO deleted_rooms (profile_id, room_key) VALUES (?, ?)",
+                (profile_id, room["name"]),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True}

@@ -77,6 +77,20 @@ function App() {
     setActiveTab(key)
   }
 
+  async function handleDeleteRoom() {
+    if (!openRoom) return
+    const message = openRoom.is_custom
+      ? '이 방과 모든 대화가 삭제됩니다. 계속할까요?'
+      : '이 방과 모든 대화가 삭제됩니다. 계속할까요?\n다시 만들기를 해도 이 방은 생기지 않습니다.'
+    if (!window.confirm(message)) return
+    try {
+      await apiRequest(`/rooms/${openRoom.id}`, { method: 'DELETE' })
+      setOpenRoom(null)
+    } catch (e) {
+      window.alert(e.message)
+    }
+  }
+
   function toggleAutoTick(enabled) {
     setAutoTickEnabled(enabled)
     try { localStorage.setItem(AUTO_TICK_STORAGE_KEY, String(enabled)) } catch (e) { /* ignore */ }
@@ -150,6 +164,7 @@ function App() {
           <>
             <button type="button" className="app-header-back" onClick={() => setOpenRoom(null)}>‹</button>
             <span className="app-header-title">{openRoom.name}</span>
+            <button type="button" className="app-header-delete" onClick={handleDeleteRoom}>삭제</button>
           </>
         ) : (
           <button type="button" className="app-header-profile-button" onClick={() => setProfileSheetOpen(true)}>

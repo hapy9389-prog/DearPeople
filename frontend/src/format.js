@@ -28,7 +28,10 @@ export function formatDateDivider(createdAt) {
   }).format(toDate(createdAt))
 }
 
-const RELATION_EMOJI = { '엄마': '👩', '아빠': '👨', '형제자매': '🧒', '친구': '🧑' }
+const RELATION_EMOJI = {
+  '엄마': '👩', '아빠': '👨', '형제자매': '🧒', '친구': '🧑',
+  '할머니': '👵', '할아버지': '👴', '선배': '🧑', '동료': '🧑',
+}
 export function relationEmoji(relation) {
   return RELATION_EMOJI[relation] || '🙂'
 }

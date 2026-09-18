@@ -109,9 +109,19 @@ body {
 }
 
 .app-header-title {
+  flex: 1;
   font-size: 16px;
   font-weight: bold;
   color: var(--text);
+}
+
+.app-header-delete {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 4px 8px;
+  cursor: pointer;
 }
 
 .tab-bar {
@@ -184,6 +194,13 @@ body {
   border: 1px solid var(--line);
   border-radius: 6px;
   font-size: 14px;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .btn-primary {
@@ -361,6 +378,10 @@ body {
   font-size: 12px;
   line-height: 1.4;
   color: var(--text-muted);
+}
+
+.room-create-bar {
+  padding: 4px 16px 12px;
 }
 
 .auto-tick-toggle {
@@ -890,4 +911,81 @@ body {
 
 .profile-sheet-create {
   width: 100%;
+}
+
+.room-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(46, 40, 35, 0.4);
+  display: flex;
+  align-items: flex-end;
+  z-index: 20;
+}
+
+.room-sheet {
+  width: 100%;
+  max-height: 70%;
+  background: var(--surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 8px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 -4px 16px rgba(46, 40, 35, 0.12);
+  animation: profile-sheet-up 0.18s ease-out;
+  overflow-y: auto;
+}
+
+.room-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  margin: 4px auto 0;
+}
+
+.room-sheet-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.room-sheet-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.room-sheet-member-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 14px;
+}
+
+.room-sheet-member-relation {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.room-sheet-includes-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin: 4px 0 12px;
+}
+
+.room-sheet-submit {
+  margin-bottom: 0;
 }

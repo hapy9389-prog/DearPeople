@@ -28,7 +28,7 @@ function withDisplayFlags(messages) {
   })
 }
 
-function ChatRoom({ roomId, characters }) {
+function ChatRoom({ roomId, characters, animateFirst }) {
   const [room, setRoom] = useState(null)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -42,9 +42,17 @@ function ChatRoom({ roomId, characters }) {
 
   useEffect(() => {
     apiRequest(`/rooms/${roomId}/messages`)
-      .then((data) => { setRoom(data.room); setMessages(data.messages) })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false))
+      .then(async (data) => {
+        setRoom(data.room)
+        setLoading(false)
+        if (animateFirst && data.messages.length > 0) {
+          setTyping(true)
+          await revealReplies(data.messages)
+        } else {
+          setMessages(data.messages)
+        }
+      })
+      .catch((e) => { setError(e.message); setLoading(false) })
   }, [roomId])
 
   useEffect(() => {

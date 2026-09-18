@@ -8,7 +8,20 @@ const RELATION_TO_GRP = {
   친구: 'friend',
 }
 
-const EMPTY_FORM = { relation: '엄마', name: '', description: '' }
+const EMPTY_FORM = {
+  relationOption: '엄마', customRelation: '', customGrp: 'family', name: '', description: '',
+}
+
+function resolveRelationAndGrp(form) {
+  if (form.relationOption === '기타') {
+    return { relation: form.customRelation.trim(), grp: form.customGrp }
+  }
+  return { relation: form.relationOption, grp: RELATION_TO_GRP[form.relationOption] }
+}
+
+function isRelationValid(form) {
+  return form.relationOption !== '기타' || form.customRelation.trim().length > 0
+}
 
 function CharacterForm({ onSaved }) {
   const [form, setForm] = useState(EMPTY_FORM)
@@ -17,15 +30,15 @@ function CharacterForm({ onSaved }) {
   const [error, setError] = useState(null)
 
   async function handleDraft() {
-    if (!form.name.trim() || !form.description.trim()) return
+    if (!form.name.trim() || !form.description.trim() || !isRelationValid(form)) return
     setLoading('drafting')
     setError(null)
     try {
-      const grp = RELATION_TO_GRP[form.relation]
+      const { relation, grp } = resolveRelationAndGrp(form)
       const result = await apiRequest('/characters/draft', {
         method: 'POST',
         body: JSON.stringify({
-          relation: form.relation,
+          relation,
           grp,
           name: form.name,
           description: form.description,
@@ -43,12 +56,12 @@ function CharacterForm({ onSaved }) {
     setLoading('saving')
     setError(null)
     try {
-      const grp = RELATION_TO_GRP[form.relation]
+      const { relation, grp } = resolveRelationAndGrp(form)
       await apiRequest('/characters', {
         method: 'POST',
-        body: JSON.stringify({ relation: form.relation, grp, name: form.name, ...draft }),
+        body: JSON.stringify({ relation, grp, name: form.name, ...draft }),
       })
-      const saved = { relation: form.relation, name: form.name }
+      const saved = { relation, name: form.name }
       setForm(EMPTY_FORM)
       setDraft(null)
       onSaved(saved)
@@ -80,15 +93,40 @@ function CharacterForm({ onSaved }) {
           <div className="field">
             <label>관계</label>
             <select
-              value={form.relation}
-              onChange={(e) => setForm({ ...form, relation: e.target.value })}
+              value={form.relationOption}
+              onChange={(e) => setForm({ ...form, relationOption: e.target.value })}
             >
               <option value="엄마">엄마</option>
               <option value="아빠">아빠</option>
               <option value="형제자매">형제자매</option>
               <option value="친구">친구</option>
+              <option value="기타">기타</option>
             </select>
           </div>
+          {form.relationOption === '기타' && (
+            <>
+              <div className="field">
+                <label>관계 이름</label>
+                <input
+                  type="text"
+                  value={form.customRelation}
+                  onChange={(e) => setForm({ ...form, customRelation: e.target.value })}
+                  placeholder="예: 할머니, 선배, 동료"
+                />
+              </div>
+              <div className="field">
+                <label>그룹</label>
+                <select
+                  value={form.customGrp}
+                  onChange={(e) => setForm({ ...form, customGrp: e.target.value })}
+                >
+                  <option value="family">가족</option>
+                  <option value="friend">친구</option>
+                </select>
+                <span className="field-hint">방을 자동으로 만들 때 쓰이는 분류예요</span>
+              </div>
+            </>
+          )}
           <div className="field">
             <label>이름</label>
             <input
@@ -153,7 +191,7 @@ function CharacterForm({ onSaved }) {
             type="button"
             className="btn-primary"
             onClick={handleSaveCharacter}
-            disabled={loading === 'saving'}
+            disabled={loading === 'saving' || !isRelationValid(form)}
           >
             {loading === 'saving' ? '저장 중...' : '저장'}
           </button>

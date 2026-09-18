@@ -43,7 +43,8 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             type TEXT NOT NULL,
-            includes_me INTEGER NOT NULL DEFAULT 1
+            includes_me INTEGER NOT NULL DEFAULT 1,
+            is_custom INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS room_members (
@@ -67,6 +68,13 @@ def init_db() -> None:
             key TEXT PRIMARY KEY,
             value TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS deleted_rooms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            profile_id INTEGER NOT NULL REFERENCES profiles(id),
+            room_key TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
         """
     )
     existing_cols = [row["name"] for row in conn.execute("PRAGMA table_info(messages)").fetchall()]
@@ -84,6 +92,10 @@ def init_db() -> None:
     profile_cols = [row["name"] for row in conn.execute("PRAGMA table_info(profiles)").fetchall()]
     if "emoji" not in profile_cols:
         conn.execute("ALTER TABLE profiles ADD COLUMN emoji TEXT NOT NULL DEFAULT '🙂'")
+
+    room_cols2 = [row["name"] for row in conn.execute("PRAGMA table_info(rooms)").fetchall()]
+    if "is_custom" not in room_cols2:
+        conn.execute("ALTER TABLE rooms ADD COLUMN is_custom INTEGER NOT NULL DEFAULT 0")
 
     # 기존 데이터 보존용 1회성 백필: profiles가 비어있고 characters에 데이터가 있으면
     # me_name으로 프로필 하나를 만들어 기존 캐릭터·방을 모두 그 프로필에 연결한다.
@@ -150,6 +162,7 @@ def clear_profile_data(profile_id: int) -> None:
         )
         conn.execute("DELETE FROM rooms WHERE profile_id = ?", (profile_id,))
         conn.execute("DELETE FROM characters WHERE profile_id = ?", (profile_id,))
+        conn.execute("DELETE FROM deleted_rooms WHERE profile_id = ?", (profile_id,))
         conn.commit()
     finally:
         conn.close()
