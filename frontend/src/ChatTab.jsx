@@ -98,6 +98,11 @@ function ChatTab({
           {ticking ? '시간이 흐르는 중...' : '시간 흐르기'}
         </button>
       </div>
+      <div className="tick-hint">
+        {autoTickEnabled
+          ? '대화가 자동으로 이어지는 중입니다.'
+          : '자동 시간 흐르기를 켜면 대화가 계속 이어집니다.'}
+      </div>
       {tickError && <div className="error-banner">{tickError}</div>}
       <ul className="room-list">
         {rooms.map((room) => (

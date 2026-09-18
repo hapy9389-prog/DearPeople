@@ -1,11 +1,10 @@
 """시연 준비용 시드 스크립트. 실행: python seed.py
-DB를 초기화하고 고정된 캐릭터 5명을 넣은 뒤, 기존 /api/rooms/generate 경로를 그대로 호출해
-방과 첫 대화를 생성한다(이 단계만 AI를 호출한다)."""
+'경민' 프로필이 없으면 새로 만들고, 있으면 그 프로필로 전환한 뒤 비우고 다시 채운다.
+다른 프로필은 전혀 건드리지 않는다. 방/첫 대화 생성 단계에서만 AI를 호출한다."""
 
-import sys
-
-from db import DB_PATH, get_connection, init_db
+from db import clear_profile_data, get_connection, init_db
 from routes_characters import CharacterSaveRequest, create_character
+from routes_profiles import ProfileCreateRequest, create_profile
 from routes_rooms import generate_rooms
 
 MY_NAME = "경민"
@@ -69,20 +68,31 @@ CHARACTERS = [
 ]
 
 
-def confirm_reset():
-    if not DB_PATH.exists():
-        return
-    answer = input(f"기존 데이터({DB_PATH.name})를 모두 지우고 새로 채웁니다. 계속할까요? (y/N): ").strip().lower()
-    if answer != "y":
-        print("취소했습니다.")
-        sys.exit(0)
+def seed_profile():
+    """'경민' 프로필이 이미 있으면 그 프로필로 전환 후 비우고, 없으면 새로 만든다.
+    다른 프로필은 건드리지 않는다."""
+    conn = get_connection()
+    try:
+        existing = conn.execute("SELECT id FROM profiles WHERE name = ?", (MY_NAME,)).fetchone()
+    finally:
+        conn.close()
 
-
-def reset_db():
-    if DB_PATH.exists():
-        DB_PATH.unlink()
-    init_db()
-    print("[1/4] DB 초기화 완료")
+    if existing:
+        profile_id = existing["id"]
+        conn = get_connection()
+        try:
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES ('current_profile_id', ?)",
+                (str(profile_id),),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        clear_profile_data(profile_id)
+        print(f"[1/4] 기존 '{MY_NAME}' 프로필로 전환 후 비움 (id={profile_id})")
+    else:
+        result = create_profile(ProfileCreateRequest(name=MY_NAME))
+        print(f"[1/4] 새 프로필 생성 및 전환: {MY_NAME} (id={result['id']})")
 
 
 def seed_settings():
@@ -109,8 +119,8 @@ def seed_rooms():
 
 
 def main():
-    confirm_reset()
-    reset_db()
+    init_db()
+    seed_profile()
     seed_settings()
     seed_characters()
     seed_rooms()

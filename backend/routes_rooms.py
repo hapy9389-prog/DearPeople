@@ -5,15 +5,17 @@ import os
 from fastapi import APIRouter, HTTPException
 
 from ai import call_claude_json
-from db import get_connection
+from db import get_connection, get_current_profile_id
 from routes_characters import build_character_description
 
 router = APIRouter()
 
 
-def fetch_characters(conn):
+def fetch_characters(conn, profile_id):
     rows = conn.execute(
-        "SELECT id, relation, grp, name, personality, speech_style, calls_me FROM characters"
+        "SELECT id, relation, grp, name, personality, speech_style, calls_me "
+        "FROM characters WHERE profile_id = ?",
+        (profile_id,),
     ).fetchall()
     return [dict(r) for r in rows]
 
@@ -122,7 +124,8 @@ def generate_room_messages(room, characters_by_id, my_name, chat_model):
 def generate_rooms():
     conn = get_connection()
     try:
-        characters = fetch_characters(conn)
+        profile_id = get_current_profile_id(conn)
+        characters = fetch_characters(conn, profile_id)
         me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
     finally:
         conn.close()
@@ -158,15 +161,21 @@ def generate_rooms():
     # 모든 방의 생성이 끝난 뒤에만 DB를 건드린다 (실패 시 기존 데이터 보존).
     conn = get_connection()
     try:
-        conn.execute("DELETE FROM messages WHERE room_id IN (SELECT id FROM rooms)")
-        conn.execute("DELETE FROM room_members")
-        conn.execute("DELETE FROM rooms")
+        conn.execute(
+            "DELETE FROM messages WHERE room_id IN (SELECT id FROM rooms WHERE profile_id = ?)",
+            (profile_id,),
+        )
+        conn.execute(
+            "DELETE FROM room_members WHERE room_id IN (SELECT id FROM rooms WHERE profile_id = ?)",
+            (profile_id,),
+        )
+        conn.execute("DELETE FROM rooms WHERE profile_id = ?", (profile_id,))
 
         for entry in generated:
             plan = entry["plan"]
             cur = conn.execute(
-                "INSERT INTO rooms (name, type, includes_me) VALUES (?, ?, ?)",
-                (plan["name"], plan["type"], plan["includes_me"]),
+                "INSERT INTO rooms (profile_id, name, type, includes_me) VALUES (?, ?, ?, ?)",
+                (profile_id, plan["name"], plan["type"], plan["includes_me"]),
             )
             room_id = cur.lastrowid
             for cid in plan["member_ids"]:
@@ -190,7 +199,10 @@ def generate_rooms():
 def list_rooms():
     conn = get_connection()
     try:
-        rooms = conn.execute("SELECT id, name, type, includes_me FROM rooms ORDER BY id").fetchall()
+        rooms = conn.execute(
+            "SELECT id, name, type, includes_me FROM rooms WHERE profile_id = ? ORDER BY id",
+            (get_current_profile_id(conn),),
+        ).fetchall()
         result = []
         for r in rooms:
             members = conn.execute(

@@ -6,7 +6,7 @@ import random
 from fastapi import APIRouter, HTTPException
 
 from ai import call_claude_json
-from db import get_connection
+from db import get_connection, get_current_profile_id
 from images import pick_photo
 from routes_characters import build_character_description
 from routes_messages import fetch_recent_messages, format_recent_conversation
@@ -162,8 +162,10 @@ def generate_tick_messages_for_room(room, my_name, chat_model):
 def tick():
     conn = get_connection()
     try:
+        profile_id = get_current_profile_id(conn)
         rooms = [dict(r) for r in conn.execute(
-            "SELECT id, name, includes_me FROM rooms ORDER BY id"
+            "SELECT id, name, includes_me FROM rooms WHERE profile_id = ? ORDER BY id",
+            (profile_id,),
         ).fetchall()]
         me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
     finally:

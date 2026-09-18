@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai import call_claude_json
-from db import get_connection
+from db import get_connection, get_current_profile_id
 from routes_characters import build_character_description
 from routes_rooms import resolve_sender
 
@@ -137,7 +137,8 @@ def get_room_messages(room_id: int):
     conn = get_connection()
     try:
         room = conn.execute(
-            "SELECT id, name, includes_me FROM rooms WHERE id = ?", (room_id,)
+            "SELECT id, name, includes_me FROM rooms WHERE id = ? AND profile_id = ?",
+            (room_id, get_current_profile_id(conn)),
         ).fetchone()
         if not room:
             raise HTTPException(status_code=404, detail="채팅방을 찾을 수 없습니다.")
@@ -179,7 +180,8 @@ def post_room_message(room_id: int, body: MessageCreateRequest):
     conn = get_connection()
     try:
         room_row = conn.execute(
-            "SELECT id, name, includes_me FROM rooms WHERE id = ?", (room_id,)
+            "SELECT id, name, includes_me FROM rooms WHERE id = ? AND profile_id = ?",
+            (room_id, get_current_profile_id(conn)),
         ).fetchone()
         if not room_row:
             raise HTTPException(status_code=404, detail="채팅방을 찾을 수 없습니다.")

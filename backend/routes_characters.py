@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai import call_claude_json
-from db import get_connection
+from db import get_connection, get_current_profile_id
 
 router = APIRouter()
 
@@ -80,9 +80,12 @@ def create_character(body: CharacterSaveRequest):
     conn = get_connection()
     try:
         cur = conn.execute(
-            "INSERT INTO characters (relation, grp, name, personality, speech_style, calls_me) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (body.relation, body.grp, body.name, body.personality, body.speech_style, body.calls_me),
+            "INSERT INTO characters (profile_id, relation, grp, name, personality, speech_style, calls_me) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                get_current_profile_id(conn), body.relation, body.grp, body.name,
+                body.personality, body.speech_style, body.calls_me,
+            ),
         )
         character_id = cur.lastrowid
         for memory in body.memories:
@@ -102,7 +105,8 @@ def list_characters():
     try:
         rows = conn.execute(
             "SELECT id, relation, grp, name, personality, speech_style, calls_me "
-            "FROM characters ORDER BY id"
+            "FROM characters WHERE profile_id = ? ORDER BY id",
+            (get_current_profile_id(conn),),
         ).fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -113,15 +117,19 @@ def list_characters():
 def delete_character(character_id: int):
     conn = get_connection()
     try:
+        owned = conn.execute(
+            "SELECT 1 FROM characters WHERE id = ? AND profile_id = ?",
+            (character_id, get_current_profile_id(conn)),
+        ).fetchone()
+        if not owned:
+            raise HTTPException(status_code=404, detail="캐릭터를 찾을 수 없습니다.")
         conn.execute("DELETE FROM messages WHERE sender_character_id = ?", (character_id,))
         conn.execute("DELETE FROM room_members WHERE character_id = ?", (character_id,))
         conn.execute("DELETE FROM memories WHERE character_id = ?", (character_id,))
-        cur = conn.execute("DELETE FROM characters WHERE id = ?", (character_id,))
+        conn.execute("DELETE FROM characters WHERE id = ?", (character_id,))
         conn.commit()
     finally:
         conn.close()
-    if cur.rowcount == 0:
-        raise HTTPException(status_code=404, detail="캐릭터를 찾을 수 없습니다.")
     return {"ok": True}
 
 
@@ -134,7 +142,8 @@ def list_memories(character_id: int):
     conn = get_connection()
     try:
         character = conn.execute(
-            "SELECT id FROM characters WHERE id = ?", (character_id,)
+            "SELECT id FROM characters WHERE id = ? AND profile_id = ?",
+            (character_id, get_current_profile_id(conn)),
         ).fetchone()
         if character is None:
             raise HTTPException(status_code=404, detail="캐릭터를 찾을 수 없습니다.")
@@ -155,7 +164,8 @@ def create_memory(character_id: int, body: MemoryRequest):
     conn = get_connection()
     try:
         character = conn.execute(
-            "SELECT id FROM characters WHERE id = ?", (character_id,)
+            "SELECT id FROM characters WHERE id = ? AND profile_id = ?",
+            (character_id, get_current_profile_id(conn)),
         ).fetchone()
         if character is None:
             raise HTTPException(status_code=404, detail="캐릭터를 찾을 수 없습니다.")
@@ -176,16 +186,17 @@ def update_memory(memory_id: int, body: MemoryRequest):
         raise HTTPException(status_code=400, detail="내용을 입력해주세요.")
     conn = get_connection()
     try:
-        cur = conn.execute(
-            "UPDATE memories SET content = ? WHERE id = ?",
-            (body.content.strip(), memory_id),
-        )
+        owned = conn.execute(
+            "SELECT 1 FROM memories m JOIN characters c ON c.id = m.character_id "
+            "WHERE m.id = ? AND c.profile_id = ?",
+            (memory_id, get_current_profile_id(conn)),
+        ).fetchone()
+        if not owned:
+            raise HTTPException(status_code=404, detail="기억을 찾을 수 없습니다.")
+        conn.execute("UPDATE memories SET content = ? WHERE id = ?", (body.content.strip(), memory_id))
         conn.commit()
-        found = cur.rowcount > 0
     finally:
         conn.close()
-    if not found:
-        raise HTTPException(status_code=404, detail="기억을 찾을 수 없습니다.")
     return {"id": memory_id, "content": body.content.strip()}
 
 
@@ -193,11 +204,15 @@ def update_memory(memory_id: int, body: MemoryRequest):
 def delete_memory(memory_id: int):
     conn = get_connection()
     try:
-        cur = conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+        owned = conn.execute(
+            "SELECT 1 FROM memories m JOIN characters c ON c.id = m.character_id "
+            "WHERE m.id = ? AND c.profile_id = ?",
+            (memory_id, get_current_profile_id(conn)),
+        ).fetchone()
+        if not owned:
+            raise HTTPException(status_code=404, detail="기억을 찾을 수 없습니다.")
+        conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
         conn.commit()
-        found = cur.rowcount > 0
     finally:
         conn.close()
-    if not found:
-        raise HTTPException(status_code=404, detail="기억을 찾을 수 없습니다.")
     return {"ok": True}

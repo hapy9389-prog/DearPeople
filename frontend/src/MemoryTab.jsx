@@ -128,13 +128,15 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
       )}
 
       <div className="memory-add-bar">
-        <input
-          type="text"
+        <textarea
+          rows={3}
           value={newMemoryText}
           onChange={(e) => setNewMemoryText(e.target.value)}
           placeholder="새 기억 추가"
         />
-        <button type="button" className="btn-primary" onClick={handleAdd}>추가</button>
+        <button type="button" className="btn-primary" onClick={handleAdd} disabled={!newMemoryText.trim()}>
+          추가
+        </button>
       </div>
     </div>
   )

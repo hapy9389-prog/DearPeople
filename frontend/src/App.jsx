@@ -3,7 +3,9 @@ import Onboarding from './Onboarding'
 import ChatTab from './ChatTab'
 import PeopleTab from './PeopleTab'
 import MemoryTab from './MemoryTab'
+import ProfileSheet from './ProfileSheet'
 import { apiRequest } from './api'
+import { avatarColor } from './format'
 
 const TABS = [
   { key: 'chat', label: '채팅' },
@@ -23,7 +25,9 @@ function App() {
   const [memoryTabCharacterId, setMemoryTabCharacterId] = useState(null)
   const [characters, setCharacters] = useState([])
   const [openRoom, setOpenRoom] = useState(null)
-  const [myName, setMyName] = useState('나')
+  const [profile, setProfile] = useState({ id: null, name: '', emoji: '🙂' })
+  const [profileSheetOpen, setProfileSheetOpen] = useState(false)
+  const [profileVersion, setProfileVersion] = useState(0)
   const [autoTickEnabled, setAutoTickEnabled] = useState(() => {
     try { return localStorage.getItem(AUTO_TICK_STORAGE_KEY) === 'true' } catch (e) { return false }
   })
@@ -34,6 +38,38 @@ function App() {
   function openMemoriesForCharacter(characterId) {
     setMemoryTabCharacterId(characterId)
     setActiveTab('memory')
+  }
+
+  function refreshCharacters() {
+    apiRequest('/characters').then(setCharacters).catch(() => {})
+  }
+
+  function refreshProfile() {
+    apiRequest('/profiles').then((d) => {
+      const current = d.profiles.find((p) => p.id === d.current_profile_id)
+      if (current) setProfile({ id: current.id, name: current.name, emoji: current.emoji })
+    }).catch(() => {})
+  }
+
+  function applyProfileSwitchCommon() {
+    setProfileSheetOpen(false)
+    setRoomBadges({})
+    setOpenRoom(null)
+    setMemoryTabCharacterId(null)
+    setActiveTab('chat')
+    setProfileVersion((v) => v + 1)
+    refreshCharacters()
+    refreshProfile()
+  }
+
+  function handleProfileSwitched() {
+    applyProfileSwitchCommon()
+    setPhase('main')
+  }
+
+  function handleProfileCreated() {
+    applyProfileSwitchCommon()
+    setPhase('onboarding')
   }
 
   function handleTabClick(key) {
@@ -72,7 +108,7 @@ function App() {
       .then((rooms) => setPhase(rooms.length === 0 ? 'onboarding' : 'main'))
       .catch(() => setPhase('main'))
     apiRequest('/characters').then(setCharacters).catch(() => {})
-    apiRequest('/settings/me').then((d) => setMyName(d.name)).catch(() => {})
+    refreshProfile()
   }, [])
 
   useEffect(() => {
@@ -99,7 +135,12 @@ function App() {
   }
 
   if (phase === 'onboarding') {
-    return <Onboarding onComplete={() => { setPhase('main'); setActiveTab('chat') }} />
+    return (
+      <Onboarding
+        onComplete={() => { refreshCharacters(); refreshProfile(); setPhase('main'); setActiveTab('chat') }}
+        onExit={handleProfileSwitched}
+      />
+    )
   }
 
   return (
@@ -111,15 +152,24 @@ function App() {
             <span className="app-header-title">{openRoom.name}</span>
           </>
         ) : (
-          <div className="app-header-brand">
-            <span className="app-header-logo">DearPeople</span>
-            <span className="app-header-username">{myName}</span>
-          </div>
+          <button type="button" className="app-header-profile-button" onClick={() => setProfileSheetOpen(true)}>
+            <span className="avatar app-header-avatar" style={{ background: avatarColor(profile.name) }}>
+              {profile.emoji}
+            </span>
+            <span className="app-header-brand">
+              <span className="app-header-logo">DearPeople</span>
+              <span className="app-header-username">
+                {profile.name}
+                <span className="app-header-profile-indicator">▾</span>
+              </span>
+            </span>
+          </button>
         )}
       </header>
       <main className="screen">
         {activeTab === 'chat' && (
           <ChatTab
+            key={profileVersion}
             roomBadges={roomBadges}
             setRoomBadges={setRoomBadges}
             characters={characters}
@@ -130,9 +180,17 @@ function App() {
             tickVersion={tickVersion}
           />
         )}
-        {activeTab === 'people' && <PeopleTab onOpenMemories={openMemoriesForCharacter} />}
+        {activeTab === 'people' && (
+          <PeopleTab
+            key={profileVersion}
+            profile={profile}
+            onOpenMemories={openMemoriesForCharacter}
+            onCharactersChanged={refreshCharacters}
+          />
+        )}
         {activeTab === 'memory' && (
           <MemoryTab
+            key={profileVersion}
             selectedCharacterId={memoryTabCharacterId}
             onSelectCharacter={setMemoryTabCharacterId}
           />
@@ -150,6 +208,14 @@ function App() {
           </button>
         ))}
       </nav>
+      {profileSheetOpen && (
+        <ProfileSheet
+          onClose={() => setProfileSheetOpen(false)}
+          onSwitched={handleProfileSwitched}
+          onCreated={handleProfileCreated}
+          onCleared={handleProfileCreated}
+        />
+      )}
     </div>
   )
 }

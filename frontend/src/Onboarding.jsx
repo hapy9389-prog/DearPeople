@@ -1,50 +1,49 @@
 import { useState, useEffect } from 'react'
 import { apiRequest } from './api'
+import CharacterForm from './CharacterForm'
 
-const RELATION_TO_GRP = {
-  엄마: 'family',
-  아빠: 'family',
-  형제자매: 'family',
-  친구: 'friend',
-}
-
-const EMPTY_FORM = { relation: '엄마', name: '', description: '' }
-
-function Onboarding({ onComplete }) {
+function Onboarding({ onComplete, onExit }) {
   const [myName, setMyName] = useState('')
   const [step, setStep] = useState('name')
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [draft, setDraft] = useState(null)
   const [savedCharacters, setSavedCharacters] = useState([])
   const [loading, setLoading] = useState('idle')
   const [error, setError] = useState(null)
+  const [profilesInfo, setProfilesInfo] = useState({ profiles: [], current_profile_id: null })
+  const [exiting, setExiting] = useState(false)
 
   useEffect(() => {
     apiRequest('/characters')
       .then((chars) => setSavedCharacters(chars.map((c) => ({ relation: c.relation, name: c.name }))))
       .catch(() => {})
+    apiRequest('/profiles').then(setProfilesInfo).catch(() => {})
   }, [])
 
-  function handleNameNext() {
-    if (myName.trim()) setStep('character-form')
-  }
-
-  async function handleDraft() {
-    if (!form.name.trim() || !form.description.trim()) return
-    setLoading('drafting')
+  async function handleExit() {
+    const message = savedCharacters.length > 0
+      ? `만들던 프로필과 지금까지 추가한 캐릭터 ${savedCharacters.length}명이 함께 삭제됩니다. 나가시겠어요?`
+      : '만들던 프로필이 삭제됩니다. 나가시겠어요?'
+    if (!window.confirm(message)) return
+    setExiting(true)
     setError(null)
     try {
-      const grp = RELATION_TO_GRP[form.relation]
-      const result = await apiRequest('/characters/draft', {
-        method: 'POST',
-        body: JSON.stringify({
-          relation: form.relation,
-          grp,
-          name: form.name,
-          description: form.description,
-        }),
+      await apiRequest(`/profiles/${profilesInfo.current_profile_id}`, { method: 'DELETE' })
+      onExit()
+    } catch (e) {
+      setError(e.message)
+      setExiting(false)
+    }
+  }
+
+  async function handleNameNext() {
+    if (!myName.trim()) return
+    setLoading('naming')
+    setError(null)
+    try {
+      await apiRequest('/profiles/current/name', {
+        method: 'PUT',
+        body: JSON.stringify({ name: myName.trim() }),
       })
-      setDraft(result)
+      setStep('character-form')
     } catch (e) {
       setError(e.message)
     } finally {
@@ -52,23 +51,8 @@ function Onboarding({ onComplete }) {
     }
   }
 
-  async function handleSaveCharacter() {
-    setLoading('saving')
-    setError(null)
-    try {
-      const grp = RELATION_TO_GRP[form.relation]
-      await apiRequest('/characters', {
-        method: 'POST',
-        body: JSON.stringify({ relation: form.relation, grp, name: form.name, ...draft }),
-      })
-      setSavedCharacters((prev) => [...prev, { relation: form.relation, name: form.name }])
-      setForm(EMPTY_FORM)
-      setDraft(null)
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading('idle')
-    }
+  function handleCharacterSaved(saved) {
+    setSavedCharacters((prev) => [...prev, saved])
   }
 
   async function handleStart() {
@@ -77,27 +61,20 @@ function Onboarding({ onComplete }) {
     try {
       await apiRequest('/settings/me', { method: 'PUT', body: JSON.stringify({ name: myName }) })
       await apiRequest('/rooms/generate', { method: 'POST' })
-      onComplete()
+      onComplete(myName)
     } catch (e) {
       setError(e.message)
       setLoading('idle')
     }
   }
 
-  function updateDraftField(field, value) {
-    setDraft((prev) => ({ ...prev, [field]: value }))
-  }
-
-  function updateDraftMemory(index, value) {
-    setDraft((prev) => {
-      const memories = [...prev.memories]
-      memories[index] = value
-      return { ...prev, memories }
-    })
-  }
-
   return (
     <div className="onboarding">
+      {profilesInfo.profiles.length > 1 && (
+        <button type="button" className="onboarding-back" onClick={handleExit} disabled={exiting}>
+          {exiting ? '나가는 중...' : '‹ 뒤로'}
+        </button>
+      )}
       <h1 className="onboarding-title">DearPeople</h1>
       {error && <div className="error-banner">{error}</div>}
 
@@ -112,8 +89,13 @@ function Onboarding({ onComplete }) {
               placeholder="이름을 입력하세요"
             />
           </div>
-          <button type="button" className="btn-primary" onClick={handleNameNext} disabled={!myName.trim()}>
-            다음
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={handleNameNext}
+            disabled={!myName.trim() || loading === 'naming'}
+          >
+            {loading === 'naming' ? '처리 중...' : '다음'}
           </button>
         </>
       )}
@@ -138,90 +120,7 @@ function Onboarding({ onComplete }) {
             </div>
           )}
 
-          {draft === null && (
-            <>
-              <div className="field">
-                <label>관계</label>
-                <select
-                  value={form.relation}
-                  onChange={(e) => setForm({ ...form, relation: e.target.value })}
-                >
-                  <option value="엄마">엄마</option>
-                  <option value="아빠">아빠</option>
-                  <option value="형제자매">형제자매</option>
-                  <option value="친구">친구</option>
-                </select>
-              </div>
-              <div className="field">
-                <label>이름</label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="예: 민수"
-                />
-              </div>
-              <div className="field">
-                <label>한 줄 설명</label>
-                <input
-                  type="text"
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="이 사람은 어떤 사람인가요?"
-                />
-              </div>
-              <button type="button" className="btn-primary" onClick={handleDraft} disabled={loading === 'drafting'}>
-                {loading === 'drafting' ? '생성 중...' : '초안 만들기'}
-              </button>
-            </>
-          )}
-
-          {draft !== null && (
-            <>
-              <div className="field">
-                <label>성격</label>
-                <input
-                  type="text"
-                  value={draft.personality}
-                  onChange={(e) => updateDraftField('personality', e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label>말투</label>
-                <input
-                  type="text"
-                  value={draft.speech_style}
-                  onChange={(e) => updateDraftField('speech_style', e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label>나를 부르는 호칭</label>
-                <input
-                  type="text"
-                  value={draft.calls_me}
-                  onChange={(e) => updateDraftField('calls_me', e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label>기억</label>
-                <ul className="memory-list">
-                  {draft.memories.map((m, i) => (
-                    <li key={i} className="memory-item">
-                      <input type="text" value={m} onChange={(e) => updateDraftMemory(i, e.target.value)} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleSaveCharacter}
-                disabled={loading === 'saving'}
-              >
-                {loading === 'saving' ? '저장 중...' : '저장'}
-              </button>
-            </>
-          )}
+          <CharacterForm onSaved={handleCharacterSaved} />
         </>
       )}
     </div>
