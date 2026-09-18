@@ -30,6 +30,18 @@ body {
   background: var(--surface);
 }
 
+/* 앱 내부 스크롤 영역은 스크롤은 되지만 막대는 숨긴다. 브라우저 창 자체(html/body)는 건드리지 않는다. */
+.app,
+.app * {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* 구형 엣지 */
+}
+
+.app::-webkit-scrollbar,
+.app *::-webkit-scrollbar {
+  display: none; /* 크롬 계열 */
+}
+
 .screen {
   flex: 1;
   overflow-y: auto;
