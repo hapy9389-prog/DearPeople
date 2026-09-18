@@ -21,7 +21,7 @@ class MessageCreateRequest(BaseModel):
 
 def fetch_recent_messages(conn, room_id, limit=RECENT_LIMIT):
     rows = conn.execute(
-        "SELECT m.sender_character_id, m.content, c.name AS sender_name "
+        "SELECT m.sender_character_id, m.type, m.content, m.caption, c.name AS sender_name "
         "FROM messages m LEFT JOIN characters c ON c.id = m.sender_character_id "
         "WHERE m.room_id = ? ORDER BY m.id DESC LIMIT ?",
         (room_id, limit),
@@ -32,10 +32,14 @@ def fetch_recent_messages(conn, room_id, limit=RECENT_LIMIT):
 def format_recent_conversation(recent_messages, my_name):
     if not recent_messages:
         return "(대화 없음)"
-    return "\n".join(
-        f"{m['sender_name'] if m['sender_name'] else my_name}: {m['content']}"
-        for m in recent_messages
-    )
+    lines = []
+    for m in recent_messages:
+        sender = m["sender_name"] if m["sender_name"] else my_name
+        if m["type"] == "photo":
+            lines.append(f"{sender}: [사진: {m['content']}] {m['caption'] or ''}".rstrip())
+        else:
+            lines.append(f"{sender}: {m['content']}")
+    return "\n".join(lines)
 
 
 def judge_responders(conn, room, members, recent_messages, my_name, fast_model):
@@ -142,7 +146,8 @@ def get_room_messages(room_id: int):
             "WHERE rm.room_id = ? ORDER BY c.id", (room_id,),
         ).fetchall()
         rows = conn.execute(
-            "SELECT m.id, m.sender_character_id, m.content, m.created_at, c.name AS sender_name "
+            "SELECT m.id, m.sender_character_id, m.type, m.content, m.caption, m.image_path, "
+            "m.created_at, c.name AS sender_name "
             "FROM messages m LEFT JOIN characters c ON c.id = m.sender_character_id "
             "WHERE m.room_id = ? ORDER BY m.id", (room_id,),
         ).fetchall()
@@ -158,7 +163,10 @@ def get_room_messages(room_id: int):
                 "id": r["id"],
                 "sender": r["sender_name"] if r["sender_name"] else "나",
                 "sender_character_id": r["sender_character_id"],
+                "type": r["type"],
                 "content": r["content"],
+                "caption": r["caption"],
+                "image_path": r["image_path"],
                 "created_at": r["created_at"],
             }
             for r in rows

@@ -117,7 +117,7 @@ function ChatTab({
               <span className="room-item-name">{room.name}</span>
               <div className="room-item-last">
                 {room.last_message
-                  ? `${room.last_message.sender}: ${room.last_message.content}`
+                  ? `${room.last_message.sender}: ${room.last_message.type === 'photo' ? '사진' : room.last_message.content}`
                   : '대화 없음'}
               </div>
             </div>

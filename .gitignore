@@ -4,6 +4,7 @@ backend/dearpeople.db
 backend/__pycache__/
 **/__pycache__/
 backend/venv/
+backend/static/photos/
 *.pyc
 
 # node

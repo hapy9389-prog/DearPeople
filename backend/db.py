@@ -52,6 +52,7 @@ def init_db() -> None:
             type TEXT NOT NULL,
             content TEXT,
             caption TEXT,
+            image_path TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
@@ -61,5 +62,8 @@ def init_db() -> None:
         );
         """
     )
+    existing_cols = [row["name"] for row in conn.execute("PRAGMA table_info(messages)").fetchall()]
+    if "image_path" not in existing_cols:
+        conn.execute("ALTER TABLE messages ADD COLUMN image_path TEXT")
     conn.commit()
     conn.close()

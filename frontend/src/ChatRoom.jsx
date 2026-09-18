@@ -113,7 +113,21 @@ function ChatRoom({ roomId, characters }) {
                 {m.sender_character_id === null && m.showTimestamp && (
                   <span className="bubble-time">{formatTime(m.created_at)}</span>
                 )}
-                <div className="bubble">{m.content}</div>
+                {m.type === 'photo' ? (
+                  <div className="photo-card">
+                    {m.image_path ? (
+                      <img src={m.image_path} alt={m.content} className="photo-card-image" />
+                    ) : (
+                      <div className="photo-card-placeholder">
+                        <span className="photo-card-icon">📷</span>
+                        <span className="photo-card-desc">{m.content}</span>
+                      </div>
+                    )}
+                    {m.caption && <div className="photo-card-caption">{m.caption}</div>}
+                  </div>
+                ) : (
+                  <div className="bubble">{m.content}</div>
+                )}
                 {m.sender_character_id !== null && m.showTimestamp && (
                   <span className="bubble-time">{formatTime(m.created_at)}</span>
                 )}

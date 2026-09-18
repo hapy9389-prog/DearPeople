@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from db import get_connection, init_db
@@ -16,7 +18,11 @@ async def lifespan(app: FastAPI):
     yield
 
 
+STATIC_DIR = Path(__file__).parent / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+
 app = FastAPI(lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.include_router(characters_router)
 app.include_router(rooms_router)
 app.include_router(messages_router)

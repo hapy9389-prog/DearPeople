@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 
 from ai import call_claude_json
 from db import get_connection
+from images import pick_photo
 from routes_characters import build_character_description
 from routes_messages import fetch_recent_messages, format_recent_conversation
 from routes_rooms import resolve_sender
@@ -14,6 +15,7 @@ from routes_rooms import resolve_sender
 router = APIRouter()
 
 INITIATE_PROBABILITY = 0.3
+PHOTO_PROBABILITY = 0.5
 
 
 def fetch_room_members(conn, room_id):
@@ -42,16 +44,33 @@ def fetch_my_recent_messages_for_room(conn, member_ids, limit=10):
     return list(reversed(rows))
 
 
-def resolve_generated_messages(items, name_to_id, my_name):
+def resolve_generated_messages(items, name_to_id, my_name, allow_photo=False):
     resolved = []
+    photo_used = False
     for item in items:
-        content = item.get("content", "")
-        if not content:
-            continue
         ok, sender_id = resolve_sender(item.get("sender", ""), name_to_id, my_name)
         if not ok:
             continue
-        resolved.append({"sender_character_id": sender_id, "content": content, "type": "text"})
+        if allow_photo and item.get("type") == "photo" and not photo_used:
+            description = (item.get("description") or "").strip()
+            if not description:
+                continue
+            resolved.append({
+                "sender_character_id": sender_id,
+                "type": "photo",
+                "content": description,
+                "caption": (item.get("caption") or "").strip(),
+                "image_path": pick_photo(item.get("category", "")),
+            })
+            photo_used = True
+            continue
+        content = item.get("content", "")
+        if not content:
+            continue
+        resolved.append({
+            "sender_character_id": sender_id, "type": "text",
+            "content": content, "caption": None, "image_path": None,
+        })
     return resolved
 
 
@@ -62,6 +81,16 @@ def generate_no_me_conversation(conn, room, members, my_name, chat_model):
     my_recent_text = (
         "\n".join(f"[{r['room_name']}] {r['content']}" for r in my_recent) if my_recent else "(없음)"
     )
+    if random.random() < PHOTO_PROBABILITY:
+        photo_instruction = (
+            "메시지 중 정확히 1개는 반드시 참여자가 사진을 공유하는 형태로 만드세요(그 메시지의 type은 'photo'). "
+            "사진 메시지는 category(food/scenery/pet/object/place 중 하나), "
+            "description(사진 속 장면을 한두 문장으로 묘사, 사람 얼굴은 묘사하지 않음), "
+            "caption(그 사진에 캐릭터가 붙이는 짧은 말)을 포함하세요. "
+            "사진 메시지 바로 다음 메시지는 다른 참여자 한 명이 그 사진에 반응하는 내용으로 만드세요."
+        )
+    else:
+        photo_instruction = "이번에는 사진 없이 텍스트 메시지만 만드세요(모든 메시지의 type은 'text')."
     system_prompt = (
         "당신은 모바일 채팅 앱 'DearPeople'에서, 사용자가 없는 채팅방의 대화를 생성하는 도우미입니다. "
         f"채팅방 이름은 '{room['name']}'이고 참여자는 다음과 같습니다.\n{member_blocks}\n"
@@ -72,9 +101,12 @@ def generate_no_me_conversation(conn, room, members, my_name, chat_model):
         "비난이나 험담은 하지 마세요. 이전 대화를 반복하지 말고 새로운 내용으로 이어가세요. "
         "추억과 최근 대화에 없는 사건을 사실처럼 지어내지 마세요. "
         "5개 이상 8개 이하의 메시지를 만드세요. "
+        f"{photo_instruction} "
+        "사진이 아닌 메시지는 type을 'text'로 하고 content만 채우세요. "
         "sender는 반드시 위 참여자 이름 중 하나여야 하며, 사용자 이름을 sender로 쓰면 안 됩니다. "
         "반드시 아래 JSON 배열 형식으로만 응답하고, 다른 설명이나 코드블록 표시는 출력하지 마세요.\n"
-        '[{"sender": "이름", "content": "메시지 내용"}, ...]'
+        '[{"sender": "이름", "type": "text", "content": "메시지 내용"}, '
+        '{"sender": "이름", "type": "photo", "category": "food", "description": "장면 묘사", "caption": "캡션"}]'
     )
     result = call_claude_json(
         system_prompt=system_prompt,
@@ -82,7 +114,7 @@ def generate_no_me_conversation(conn, room, members, my_name, chat_model):
         model=chat_model,
     )
     name_to_id = {m["name"]: m["id"] for m in members}
-    return resolve_generated_messages(result, name_to_id, my_name)
+    return resolve_generated_messages(result, name_to_id, my_name, allow_photo=True)
 
 
 def generate_initiate_messages(conn, room, members, my_name, chat_model):
@@ -169,8 +201,12 @@ def tick():
                 continue
             for msg in messages:
                 conn.execute(
-                    "INSERT INTO messages (room_id, sender_character_id, type, content) VALUES (?, ?, ?, ?)",
-                    (room["id"], msg["sender_character_id"], msg["type"], msg["content"]),
+                    "INSERT INTO messages (room_id, sender_character_id, type, content, caption, image_path) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        room["id"], msg["sender_character_id"], msg["type"],
+                        msg["content"], msg["caption"], msg["image_path"],
+                    ),
                 )
             counts[str(room["id"])] = len(messages)
         conn.commit()
