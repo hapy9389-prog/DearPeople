@@ -97,6 +97,10 @@ def init_db() -> None:
     if "is_custom" not in room_cols2:
         conn.execute("ALTER TABLE rooms ADD COLUMN is_custom INTEGER NOT NULL DEFAULT 0")
 
+    char_cols2 = [row["name"] for row in conn.execute("PRAGMA table_info(characters)").fetchall()]
+    if "reaction_style" not in char_cols2:
+        conn.execute("ALTER TABLE characters ADD COLUMN reaction_style TEXT NOT NULL DEFAULT ''")
+
     # 기존 데이터 보존용 1회성 백필: profiles가 비어있고 characters에 데이터가 있으면
     # me_name으로 프로필 하나를 만들어 기존 캐릭터·방을 모두 그 프로필에 연결한다.
     profile_count = conn.execute("SELECT COUNT(*) AS n FROM profiles").fetchone()["n"]

@@ -15,7 +15,7 @@ router = APIRouter()
 
 def fetch_characters(conn, profile_id):
     rows = conn.execute(
-        "SELECT id, relation, grp, name, personality, speech_style, calls_me "
+        "SELECT id, relation, grp, name, personality, speech_style, calls_me, reaction_style "
         "FROM characters WHERE profile_id = ?",
         (profile_id,),
     ).fetchall()

@@ -19,6 +19,18 @@ router = APIRouter()
 RECENT_LIMIT = 20
 CHARACTER_PHOTO_PROBABILITY = 0.15
 
+REALISTIC_REACTION_INSTRUCTION = (
+    "이 캐릭터는 사용자를 아끼지만 무조건 받아주는 존재가 아니라, 실제 사람처럼 반응합니다. "
+    "사용자가 무례하게 말하거나 걱정을 무시하면 성격에 맞는 방식으로 반응하세요"
+    "(서운해하기, 잔소리, 정색, 농담으로 넘기기, 말수가 줄어들기 등 캐릭터마다 다르게 표현). "
+    "관계에 따라서도 다르게 반응하세요: 부모는 걱정과 잔소리로, 형제자매는 놀리거나 맞받아치는 식으로, "
+    "친구는 직설적으로 반응할 수 있습니다. "
+    "매번 조언하거나 대화를 마무리 지으려 하지 말고, 때로는 짧게만 답하거나 질문만 던지세요. "
+    "사용자 말에 항상 동의할 필요는 없습니다 — 생각이 다르면 다르다고 말하세요. "
+    "단, 인신공격·욕설·폭언은 어떤 경우에도 하지 않고 감정 표현은 실제 가족이나 친구가 할 법한 수준으로 유지하며, "
+    "사용자가 힘들어하는 상황에서는 감정적 반응보다 걱정을 먼저 표현하세요."
+)
+
 UPLOAD_DIR = Path(__file__).parent / "static" / "photos" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
@@ -113,6 +125,7 @@ def generate_character_reply(
         f"{description}\n채팅방: '{room['name']}'\n최근 대화:\n{conversation}\n"
         f"위 캐릭터({member['name']})의 성격과 말투를 반영해서, 대화 흐름에 자연스럽게 이어지는 "
         "답장을 1~2문장으로 짧게(카카오톡 메시지처럼 간결하게) 작성하세요. "
+        f"{REALISTIC_REACTION_INSTRUCTION} "
         f"{photo_instruction} "
         "반드시 아래 JSON 형식으로만 응답하고, 다른 설명이나 코드블록 표시는 출력하지 마세요.\n"
         f"{format_hint}"
@@ -163,6 +176,7 @@ def judge_and_generate_followup(conn, room, members, recent_messages, my_name, c
         "방금 오간 대화에 자연스럽게 한 번 더 반응할 만한 참여자가 있다면 그 사람의 이름과 "
         "1~2문장의 짧은 메시지를 작성하고, 부자연스럽거나 굳이 필요 없다면 반응하지 마세요. "
         "있어도 반응은 1명, 1턴뿐입니다. "
+        f"{REALISTIC_REACTION_INSTRUCTION} "
         "반드시 아래 JSON 형식으로만 응답하고, 다른 설명이나 코드블록 표시는 출력하지 마세요.\n"
         '{"needed": true 또는 false, "sender": "이름 또는 빈 문자열", "content": "메시지 내용 또는 빈 문자열"}'
     )
@@ -329,7 +343,7 @@ def post_room_message(room_id: int, body: MessageCreateRequest):
             raise HTTPException(status_code=400, detail="이 채팅방에는 메시지를 보낼 수 없습니다.")
 
         member_rows = conn.execute(
-            "SELECT c.id, c.name, c.relation, c.personality, c.speech_style, c.calls_me "
+            "SELECT c.id, c.name, c.relation, c.personality, c.speech_style, c.calls_me, c.reaction_style "
             "FROM room_members rm JOIN characters c ON c.id = rm.character_id "
             "WHERE rm.room_id = ? ORDER BY c.id", (room_id,),
         ).fetchall()
@@ -375,7 +389,7 @@ def post_room_photo(room_id: int, file: UploadFile = File(...), caption: str = F
             raise HTTPException(status_code=400, detail="이 채팅방에는 메시지를 보낼 수 없습니다.")
 
         member_rows = conn.execute(
-            "SELECT c.id, c.name, c.relation, c.personality, c.speech_style, c.calls_me "
+            "SELECT c.id, c.name, c.relation, c.personality, c.speech_style, c.calls_me, c.reaction_style "
             "FROM room_members rm JOIN characters c ON c.id = rm.character_id "
             "WHERE rm.room_id = ? ORDER BY c.id", (room_id,),
         ).fetchall()

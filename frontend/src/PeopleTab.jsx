@@ -17,6 +17,7 @@ function buildEditForm(c) {
     personality: c.personality,
     speech_style: c.speech_style,
     calls_me: c.calls_me,
+    reaction_style: c.reaction_style || '',
   }
 }
 
@@ -108,6 +109,7 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
           personality: editForm.personality,
           speech_style: editForm.speech_style,
           calls_me: editForm.calls_me,
+          reaction_style: editForm.reaction_style,
         }),
       })
       setEditingId(null)
@@ -195,6 +197,7 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
                   <div><strong>성격</strong> {c.personality}</div>
                   <div><strong>말투</strong> {c.speech_style}</div>
                   <div><strong>나를 부르는 호칭</strong> {c.calls_me}</div>
+                  <div><strong>서운하거나 화날 때</strong> {c.reaction_style || '(성격에서 자연스럽게 유추)'}</div>
                   <button type="button" className="people-item-edit-button" onClick={() => handleStartEdit(c)}>
                     수정
                   </button>
@@ -275,6 +278,14 @@ function PeopleTab({ profile, onOpenMemories, onCharactersChanged, onRoomsRegene
                       type="text"
                       value={editForm.calls_me}
                       onChange={(e) => setEditForm({ ...editForm, calls_me: e.target.value })}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>서운하거나 화날 때</label>
+                    <textarea
+                      rows={2}
+                      value={editForm.reaction_style}
+                      onChange={(e) => setEditForm({ ...editForm, reaction_style: e.target.value })}
                     />
                   </div>
                   <div className="people-item-edit-actions">

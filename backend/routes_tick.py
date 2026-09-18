@@ -20,7 +20,7 @@ PHOTO_PROBABILITY = 0.5
 
 def fetch_room_members(conn, room_id):
     rows = conn.execute(
-        "SELECT c.id, c.name, c.relation, c.personality, c.speech_style, c.calls_me "
+        "SELECT c.id, c.name, c.relation, c.personality, c.speech_style, c.calls_me, c.reaction_style "
         "FROM room_members rm JOIN characters c ON c.id = rm.character_id "
         "WHERE rm.room_id = ? ORDER BY c.id", (room_id,),
     ).fetchall()
@@ -97,8 +97,9 @@ def generate_no_me_conversation(conn, room, members, my_name, chat_model):
         f"이 방의 최근 대화:\n{conversation}\n"
         f"사용자({my_name})가 다른 방들에서 최근에 한 말(참고용, 방 이름 포함):\n{my_recent_text}\n"
         f"참여자들은 사용자({my_name})를 아끼는 사이입니다. 대화 주제는 주로 사용자에 대한 이야기로, "
-        "위 참고 내용을 화제 삼아 자연스럽게 이어가세요. 가벼운 놀림은 괜찮지만 "
-        "비난이나 험담은 하지 마세요. 이전 대화를 반복하지 말고 새로운 내용으로 이어가세요. "
+        "위 참고 내용을 화제 삼아 자연스럽게 이어가세요. 가벼운 놀림은 물론, 걱정이나 답답함을 "
+        "솔직하게 나누는 것도 괜찮습니다(예: '요즘 연락이 뜸하네', '그 말은 좀 서운했어'). "
+        "다만 악의적인 뒷담화나 인신공격은 하지 마세요. 이전 대화를 반복하지 말고 새로운 내용으로 이어가세요. "
         "추억과 최근 대화에 없는 사건을 사실처럼 지어내지 마세요. "
         "5개 이상 8개 이하의 메시지를 만드세요. "
         f"{photo_instruction} "

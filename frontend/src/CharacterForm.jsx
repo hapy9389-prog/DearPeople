@@ -161,6 +161,14 @@ function CharacterForm({ onSaved }) {
             />
           </div>
           <div className="field">
+            <label>서운하거나 화날 때</label>
+            <textarea
+              rows={2}
+              value={draft.reaction_style}
+              onChange={(e) => updateDraftField('reaction_style', e.target.value)}
+            />
+          </div>
+          <div className="field">
             <label>기억</label>
             <ul className="memory-list">
               {draft.memories.map((m, i) => (
