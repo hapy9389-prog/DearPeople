@@ -119,13 +119,11 @@ def init_db() -> None:
     conn.execute("UPDATE deleted_rooms SET room_key = '엄마와 아빠' WHERE room_key = '부모님방'")
 
     # 기존 데이터 보존용 1회성 백필: profiles가 비어있고 characters에 데이터가 있으면
-    # me_name으로 프로필 하나를 만들어 기존 캐릭터·방을 모두 그 프로필에 연결한다.
+    # 기본 이름('나')으로 프로필 하나를 만들어 기존 캐릭터·방을 모두 그 프로필에 연결한다.
     profile_count = conn.execute("SELECT COUNT(*) AS n FROM profiles").fetchone()["n"]
     character_count = conn.execute("SELECT COUNT(*) AS n FROM characters").fetchone()["n"]
     if profile_count == 0 and character_count > 0:
-        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
-        profile_name = me_row["value"] if me_row else "나"
-        cur = conn.execute("INSERT INTO profiles (name) VALUES (?)", (profile_name,))
+        cur = conn.execute("INSERT INTO profiles (name) VALUES (?)", ("나",))
         profile_id = cur.lastrowid
         conn.execute("UPDATE characters SET profile_id = ?", (profile_id,))
         conn.execute("UPDATE rooms SET profile_id = ?", (profile_id,))
@@ -140,7 +138,7 @@ def init_db() -> None:
 
 def get_current_profile_id(conn) -> int:
     """settings.current_profile_id가 유효하면 그대로 쓰고, 아니면 가장 작은 id의 프로필로,
-    프로필이 아예 없으면 me_name으로 기본 프로필을 만들어 대체한다. 대체 시 settings도 갱신한다."""
+    프로필이 아예 없으면 '나'라는 이름의 기본 프로필을 만들어 대체한다. 대체 시 settings도 갱신한다."""
     row = conn.execute("SELECT value FROM settings WHERE key = 'current_profile_id'").fetchone()
     if row is not None:
         candidate_id = int(row["value"])
@@ -151,9 +149,7 @@ def get_current_profile_id(conn) -> int:
     if fallback is not None:
         profile_id = fallback["id"]
     else:
-        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
-        profile_name = me_row["value"] if me_row else "나"
-        cur = conn.execute("INSERT INTO profiles (name) VALUES (?)", (profile_name,))
+        cur = conn.execute("INSERT INTO profiles (name) VALUES (?)", ("나",))
         profile_id = cur.lastrowid
 
     conn.execute(
@@ -162,6 +158,12 @@ def get_current_profile_id(conn) -> int:
     )
     conn.commit()
     return profile_id
+
+
+def get_profile_name(conn, profile_id: int) -> str:
+    """대화 생성에 쓰는 사용자 이름. 프로필 이름을 그대로 쓰고, 없으면 '나'."""
+    row = conn.execute("SELECT name FROM profiles WHERE id = ?", (profile_id,)).fetchone()
+    return row["name"] if row else "나"
 
 
 def clear_profile_data(profile_id: int) -> None:

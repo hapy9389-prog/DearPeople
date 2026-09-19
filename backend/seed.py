@@ -94,39 +94,28 @@ def seed_profile():
         finally:
             conn.close()
         clear_profile_data(profile_id)
-        print(f"[1/4] 기존 '{MY_NAME}' 프로필로 전환 후 비움 (id={profile_id})")
+        print(f"[1/3] 기존 '{MY_NAME}' 프로필로 전환 후 비움 (id={profile_id})")
     else:
         result = create_profile(ProfileCreateRequest(name=MY_NAME))
-        print(f"[1/4] 새 프로필 생성 및 전환: {MY_NAME} (id={result['id']})")
-
-
-def seed_settings():
-    conn = get_connection()
-    try:
-        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('me_name', ?)", (MY_NAME,))
-        conn.commit()
-    finally:
-        conn.close()
-    print(f"[2/4] 내 이름 설정: {MY_NAME}")
+        print(f"[1/3] 새 프로필 생성 및 전환: {MY_NAME} (id={result['id']})")
 
 
 def seed_characters():
     for c in CHARACTERS:
         create_character(CharacterSaveRequest(**c))
         print(f"  - 캐릭터 추가: {c['name']} ({c['relation']})")
-    print(f"[3/4] 캐릭터 {len(CHARACTERS)}명 추가 완료")
+    print(f"[2/3] 캐릭터 {len(CHARACTERS)}명 추가 완료")
 
 
 def seed_rooms():
-    print("[4/4] 방 생성 및 첫 대화 생성 중 (AI 호출, 시간이 걸릴 수 있습니다)...")
+    print("[3/3] 방 생성 및 첫 대화 생성 중 (AI 호출, 시간이 걸릴 수 있습니다)...")
     result = generate_rooms()
-    print(f"[4/4] 방 {result['room_count']}개 생성 완료")
+    print(f"[3/3] 방 {result['room_count']}개 생성 완료")
 
 
 def main():
     init_db()
     seed_profile()
-    seed_settings()
     seed_characters()
     seed_rooms()
     print("시연 준비 완료. 서버를 실행하세요: uvicorn main:app --reload")

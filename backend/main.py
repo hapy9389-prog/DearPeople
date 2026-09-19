@@ -3,7 +3,6 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
 from db import clear_profile_data, get_connection, get_current_profile_id, init_db
 from routes_characters import router as characters_router
@@ -48,29 +47,3 @@ def reset_all_data():
     clear_profile_data(profile_id)
     return {"ok": True}
 
-
-class SettingsMeRequest(BaseModel):
-    name: str
-
-
-@app.get("/api/settings/me")
-def get_my_name():
-    conn = get_connection()
-    try:
-        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
-    finally:
-        conn.close()
-    return {"name": me_row["value"] if me_row else "나"}
-
-
-@app.put("/api/settings/me")
-def set_my_name(body: SettingsMeRequest):
-    conn = get_connection()
-    try:
-        conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES ('me_name', ?)", (body.name,)
-        )
-        conn.commit()
-    finally:
-        conn.close()
-    return {"ok": True}

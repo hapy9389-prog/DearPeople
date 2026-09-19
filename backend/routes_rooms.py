@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai import call_claude_json
-from db import get_connection, get_current_profile_id
+from db import get_connection, get_current_profile_id, get_profile_name
 from routes_characters import build_character_description
 
 router = APIRouter()
@@ -145,7 +145,7 @@ def generate_rooms():
     try:
         profile_id = get_current_profile_id(conn)
         characters = fetch_characters(conn, profile_id)
-        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
+        my_name = get_profile_name(conn, profile_id)
         deleted_rows = conn.execute(
             "SELECT room_key FROM deleted_rooms WHERE profile_id = ?", (profile_id,)
         ).fetchall()
@@ -155,7 +155,6 @@ def generate_rooms():
     if len(characters) == 0:
         raise HTTPException(status_code=400, detail="캐릭터가 없습니다. 먼저 캐릭터를 추가해주세요.")
 
-    my_name = me_row["value"] if me_row else "나"
     deleted_names = {row["room_key"] for row in deleted_rows}
     room_plan = [r for r in build_room_plan(characters) if r["name"] not in deleted_names]
     characters_by_id = {c["id"]: c for c in characters}
@@ -276,7 +275,7 @@ def create_room(body: RoomCreateRequest):
     try:
         profile_id = get_current_profile_id(conn)
         characters = fetch_characters(conn, profile_id)
-        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
+        my_name = get_profile_name(conn, profile_id)
     finally:
         conn.close()
 
@@ -284,7 +283,6 @@ def create_room(body: RoomCreateRequest):
     if any(mid not in characters_by_id for mid in body.member_ids):
         raise HTTPException(status_code=400, detail="캐릭터를 찾을 수 없습니다.")
 
-    my_name = me_row["value"] if me_row else "나"
     member_names = [characters_by_id[mid]["name"] for mid in body.member_ids]
     room_name = body.name.strip() or ", ".join(member_names)
     includes_me_flag = 1 if body.includes_me else 0

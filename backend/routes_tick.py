@@ -6,7 +6,7 @@ import random
 from fastapi import APIRouter, HTTPException
 
 from ai import call_claude_json
-from db import get_connection, get_current_profile_id
+from db import get_connection, get_current_profile_id, get_profile_name
 from images import pick_photo
 from routes_characters import build_character_description
 from routes_messages import CHARACTER_PHOTO_PROBABILITY, fetch_recent_messages, format_recent_conversation
@@ -180,14 +180,13 @@ def tick():
             "SELECT id, name, includes_me FROM rooms WHERE profile_id = ? ORDER BY id",
             (profile_id,),
         ).fetchall()]
-        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
+        my_name = get_profile_name(conn, profile_id)
     finally:
         conn.close()
 
     if not rooms:
         raise HTTPException(status_code=400, detail="방이 없습니다.")
 
-    my_name = me_row["value"] if me_row else "나"
     chat_model = os.environ.get("CHAT_MODEL")
 
     results = [None] * len(rooms)

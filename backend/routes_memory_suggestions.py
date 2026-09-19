@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai import call_claude_json
-from db import get_connection, get_current_profile_id
+from db import get_connection, get_current_profile_id, get_profile_name
 from routes_characters import build_character_description, create_memory, MemoryRequest
 from routes_messages import fetch_recent_messages, format_recent_conversation, RECENT_LIMIT
 
@@ -168,8 +168,7 @@ def suggest_memories():
     conn = get_connection()
     try:
         profile_id = get_current_profile_id(conn)
-        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
-        my_name = me_row["value"] if me_row else "나"
+        my_name = get_profile_name(conn, profile_id)
         try:
             candidates = generate_memory_suggestion_candidates(
                 conn, profile_id, my_name, os.environ.get("FAST_MODEL")

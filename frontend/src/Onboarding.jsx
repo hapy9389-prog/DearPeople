@@ -60,7 +60,6 @@ function Onboarding({ onComplete, onExit }) {
     setLoading('starting')
     setError(null)
     try {
-      await apiRequest('/settings/me', { method: 'PUT', body: JSON.stringify({ name: myName }) })
       await apiRequest('/rooms/generate', { method: 'POST' })
       onComplete(myName)
     } catch (e) {

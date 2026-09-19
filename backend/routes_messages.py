@@ -9,7 +9,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from ai import call_claude_json
-from db import get_connection, get_current_profile_id
+from db import get_connection, get_current_profile_id, get_profile_name
 from images import pick_photo
 from routes_characters import build_character_description
 from routes_rooms import resolve_sender
@@ -350,8 +350,7 @@ def post_room_message(room_id: int, body: MessageCreateRequest):
         members = [dict(r) for r in member_rows]
         members_by_id = {m["id"]: m for m in members}
 
-        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
-        my_name = me_row["value"] if me_row else "나"
+        my_name = get_profile_name(conn, get_current_profile_id(conn))
         fast_model = os.environ.get("FAST_MODEL")
         chat_model = os.environ.get("CHAT_MODEL")
 
@@ -394,8 +393,7 @@ def post_room_photo(room_id: int, file: UploadFile = File(...), caption: str = F
             "WHERE rm.room_id = ? ORDER BY c.id", (room_id,),
         ).fetchall()
         members = [dict(r) for r in member_rows]
-        me_row = conn.execute("SELECT value FROM settings WHERE key = 'me_name'").fetchone()
-        my_name = me_row["value"] if me_row else "나"
+        my_name = get_profile_name(conn, get_current_profile_id(conn))
 
         ext = ALLOWED_IMAGE_TYPES[file.content_type]
         filename = f"{uuid.uuid4().hex}.{ext}"
