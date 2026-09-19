@@ -2,8 +2,10 @@ import os
 import re
 import sqlite3
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
+from fastapi import HTTPException
 
 from device import get_device_key
 
@@ -234,10 +236,10 @@ def init_db() -> None:
     conn.close()
 
 
-def get_current_profile_id(conn) -> int:
+def get_current_profile_id(conn) -> Optional[int]:
     """현재 기기(X-Device-Key)의 current_profile_id가 유효하면 그대로 쓰고, 아니면 그 기기의
-    가장 작은 id의 프로필로, 그 기기에 프로필이 아예 없으면 '나'라는 기본 프로필을 만들어 대체한다.
-    대체 시 settings도 갱신한다."""
+    가장 작은 id의 프로필로 대체한다(settings도 갱신). 그 기기에 프로필이 없으면 None —
+    프로필은 온보딩에서 사용자가 이름을 입력할 때만 만들어진다."""
     device_key = get_device_key()
     setting_key = "current_profile_id:" + device_key
     value = get_setting(conn, setting_key)
@@ -251,14 +253,19 @@ def get_current_profile_id(conn) -> int:
     fallback = conn.execute(
         "SELECT id FROM profiles WHERE device_key = ? ORDER BY id LIMIT 1", (device_key,)
     ).fetchone()
-    if fallback is not None:
-        profile_id = fallback["id"]
-    else:
-        cur = conn.execute("INSERT INTO profiles (name, device_key) VALUES (?, ?)", ("나", device_key))
-        profile_id = cur.lastrowid
+    if fallback is None:
+        return None
 
-    set_setting(conn, setting_key, str(profile_id))
+    set_setting(conn, setting_key, str(fallback["id"]))
     conn.commit()
+    return fallback["id"]
+
+
+def require_current_profile_id(conn) -> int:
+    """프로필이 필요한 쓰기·AI 경로용. 프로필이 없으면 404."""
+    profile_id = get_current_profile_id(conn)
+    if profile_id is None:
+        raise HTTPException(status_code=404, detail="프로필이 없습니다.")
     return profile_id
 
 

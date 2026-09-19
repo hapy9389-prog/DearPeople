@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai import call_claude_json
-from db import get_connection, get_current_profile_id, get_profile_name
+from db import get_connection, get_profile_name, require_current_profile_id
 from device import check_rate_limit
 from images import pick_photo
 from routes_characters import build_character_description
@@ -213,7 +213,7 @@ def tick(body: Optional[TickRequest] = None):
     check_rate_limit("tick", 3)
     conn = get_connection()
     try:
-        profile_id = get_current_profile_id(conn)
+        profile_id = require_current_profile_id(conn)
         rooms = [dict(r) for r in conn.execute(
             "SELECT id, name, includes_me FROM rooms WHERE profile_id = ? ORDER BY id",
             (profile_id,),

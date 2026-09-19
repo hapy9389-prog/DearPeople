@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai import call_claude_json
-from db import get_connection, get_current_profile_id, get_profile_name
+from db import get_connection, get_current_profile_id, get_profile_name, require_current_profile_id
 from routes_characters import build_character_description
 
 router = APIRouter()
@@ -144,7 +144,7 @@ def generate_room_messages(room, characters_by_id, my_name, chat_model, is_new_r
 def generate_rooms():
     conn = get_connection()
     try:
-        profile_id = get_current_profile_id(conn)
+        profile_id = require_current_profile_id(conn)
         characters = fetch_characters(conn, profile_id)
         my_name = get_profile_name(conn, profile_id)
         deleted_rows = conn.execute(
@@ -277,7 +277,7 @@ def create_room(body: RoomCreateRequest):
         raise HTTPException(status_code=400, detail="멤버를 1명 이상 선택해주세요.")
     conn = get_connection()
     try:
-        profile_id = get_current_profile_id(conn)
+        profile_id = require_current_profile_id(conn)
         characters = fetch_characters(conn, profile_id)
         my_name = get_profile_name(conn, profile_id)
     finally:
@@ -332,7 +332,7 @@ def create_room(body: RoomCreateRequest):
 def delete_room(room_id: int):
     conn = get_connection()
     try:
-        profile_id = get_current_profile_id(conn)
+        profile_id = require_current_profile_id(conn)
         room = conn.execute(
             "SELECT id, name, is_custom FROM rooms WHERE id = ? AND profile_id = ?",
             (room_id, profile_id),

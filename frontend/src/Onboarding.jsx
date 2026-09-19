@@ -40,10 +40,16 @@ function Onboarding({ onComplete, onExit }) {
     setLoading('naming')
     setError(null)
     try {
-      await apiRequest('/profiles/current/name', {
-        method: 'PUT',
-        body: JSON.stringify({ name: myName.trim() }),
-      })
+      // 프로필은 여기서 이름을 입력할 때만 만들어진다. (프로필 시트에서 미리 만든 프로필이 있으면 이름만 바꾼다)
+      const info = await apiRequest('/profiles')
+      if (info.current_profile_id === null) {
+        await apiRequest('/profiles', { method: 'POST', body: JSON.stringify({ name: myName.trim() }) })
+      } else {
+        await apiRequest('/profiles/current/name', {
+          method: 'PUT',
+          body: JSON.stringify({ name: myName.trim() }),
+        })
+      }
       setStep('character-form')
     } catch (e) {
       setError(e.message)

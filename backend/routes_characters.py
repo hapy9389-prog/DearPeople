@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai import call_claude_json
-from db import get_connection, get_current_profile_id
+from db import get_connection, get_current_profile_id, require_current_profile_id
 
 router = APIRouter()
 
@@ -90,7 +90,7 @@ def create_character(body: CharacterSaveRequest):
             "(profile_id, relation, grp, name, personality, speech_style, calls_me, reaction_style) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                get_current_profile_id(conn), body.relation, body.grp, body.name,
+                require_current_profile_id(conn), body.relation, body.grp, body.name,
                 body.personality, body.speech_style, body.calls_me, body.reaction_style,
             ),
         )

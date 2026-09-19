@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from db import clear_profile_data, get_connection, get_current_profile_id, set_setting
+from db import (
+    clear_profile_data, get_connection, get_current_profile_id, require_current_profile_id, set_setting,
+)
 from device import get_device_key
 
 router = APIRouter()
@@ -83,7 +85,7 @@ def rename_current_profile(body: ProfileRenameRequest):
         raise HTTPException(status_code=400, detail="이름을 입력해주세요.")
     conn = get_connection()
     try:
-        profile_id = get_current_profile_id(conn)
+        profile_id = require_current_profile_id(conn)
         conn.execute("UPDATE profiles SET name = ? WHERE id = ?", (name, profile_id))
         conn.commit()
     finally:

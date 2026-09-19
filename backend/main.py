@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from db import clear_profile_data, get_connection, get_current_profile_id, init_db
+from db import clear_profile_data, get_connection, init_db, require_current_profile_id
 from device import read_device_key
 from images import UPLOAD_DIR
 from routes_characters import router as characters_router
@@ -52,7 +52,7 @@ def health():
 def reset_all_data():
     conn = get_connection()
     try:
-        profile_id = get_current_profile_id(conn)
+        profile_id = require_current_profile_id(conn)
     finally:
         conn.close()
     clear_profile_data(profile_id)

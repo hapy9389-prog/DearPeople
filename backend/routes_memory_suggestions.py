@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ai import call_claude_json
-from db import get_connection, get_current_profile_id, get_profile_name
+from db import get_connection, get_current_profile_id, get_profile_name, require_current_profile_id
 from routes_characters import build_character_description, create_memory, MemoryRequest
 from routes_messages import fetch_recent_messages, format_recent_conversation, RECENT_LIMIT
 
@@ -167,7 +167,7 @@ class SuggestionAcceptRequest(BaseModel):
 def suggest_memories():
     conn = get_connection()
     try:
-        profile_id = get_current_profile_id(conn)
+        profile_id = require_current_profile_id(conn)
         my_name = get_profile_name(conn, profile_id)
         try:
             candidates = generate_memory_suggestion_candidates(
