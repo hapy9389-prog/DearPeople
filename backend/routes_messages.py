@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from ai import call_claude_json
 from db import get_connection, get_current_profile_id, get_profile_name
 from device import check_rate_limit
-from images import PHOTOS_DIR, pick_photo
+from images import UPLOAD_DIR, pick_photo
 from routes_characters import build_character_description
 from routes_rooms import resolve_sender
 
@@ -32,7 +32,6 @@ REALISTIC_REACTION_INSTRUCTION = (
     "사용자가 힘들어하는 상황에서는 감정적 반응보다 걱정을 먼저 표현하세요."
 )
 
-UPLOAD_DIR = PHOTOS_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024

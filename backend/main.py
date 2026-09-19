@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from db import clear_profile_data, get_connection, get_current_profile_id, init_db
 from device import read_device_key
-from images import PHOTOS_DIR
+from images import UPLOAD_DIR
 from routes_characters import router as characters_router
 from routes_memory_suggestions import router as memory_suggestions_router
 from routes_messages import router as messages_router
@@ -29,11 +29,11 @@ async def lifespan(app: FastAPI):
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
-PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(lifespan=lifespan, dependencies=[Depends(read_device_key)])
-# 더 구체적인 경로를 먼저 마운트한다 (PHOTOS_DIR이 저장소 밖일 수 있음).
-app.mount("/static/photos", StaticFiles(directory=str(PHOTOS_DIR)), name="photos")
+# 더 구체적인 경로를 먼저 마운트한다 (업로드 폴더는 PHOTOS_DIR 설정에 따라 저장소 밖일 수 있음).
+app.mount("/static/photos/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.include_router(characters_router)
 app.include_router(memory_suggestions_router)
