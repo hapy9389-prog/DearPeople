@@ -1,18 +1,106 @@
+import os
+import re
 import sqlite3
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+from device import get_device_key
+
+load_dotenv()
+
 DB_PATH = Path(__file__).parent / "dearpeople.db"
+MIGRATION_PATH = Path(__file__).parent.parent / "migrations" / "0001_init.sql"
+
+# RETURNING id를 붙이면 안 되는 테이블(id 컬럼이 없음)
+NO_ID_TABLES = {"room_members", "settings"}
 
 
-def get_connection() -> sqlite3.Connection:
+def use_postgres() -> bool:
+    return bool(os.environ.get("DATABASE_URL"))
+
+
+class PgCursor:
+    """sqlite3 커서처럼 fetchone/fetchall/lastrowid/rowcount를 제공하는 얇은 래퍼."""
+
+    def __init__(self, cur, lastrowid=None):
+        self._cur = cur
+        self.lastrowid = lastrowid
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+
+class PgConnection:
+    """sqlite3.Connection과 같은 방식(?, execute, row["col"])으로 psycopg2를 쓰게 하는 래퍼."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql, params=()):
+        import psycopg2.extras
+
+        sql = sql.replace("?", "%s")
+        insert = re.match(r"\s*INSERT\s+INTO\s+(\w+)", sql, re.IGNORECASE)
+        returning = bool(
+            insert and insert.group(1).lower() not in NO_ID_TABLES
+            and "RETURNING" not in sql.upper()
+        )
+        if returning:
+            sql += " RETURNING id"
+        cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(sql, tuple(params))
+        lastrowid = cur.fetchone()["id"] if returning else None
+        return PgCursor(cur, lastrowid)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+
+def get_connection():
+    if use_postgres():
+        import psycopg2
+
+        return PgConnection(psycopg2.connect(os.environ["DATABASE_URL"]))
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
     return conn
 
 
+def get_setting(conn, key):
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_setting(conn, key, value) -> None:
+    """커밋은 호출자가 한다. SQLite(3.24+)와 PostgreSQL 모두 지원하는 upsert 문법."""
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?) "
+        "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
+
+
 def init_db() -> None:
     conn = get_connection()
+    if use_postgres():
+        # 서버 DB는 빈 상태에서 시작한다. 테이블이 없을 때만 초기 스키마를 적용한다.
+        if conn.execute("SELECT to_regclass('public.profiles') AS t").fetchone()["t"] is None:
+            conn._conn.cursor().execute(MIGRATION_PATH.read_text(encoding="utf-8"))
+            conn.commit()
+        conn.close()
+        return
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS profiles (
@@ -118,44 +206,58 @@ def init_db() -> None:
     conn.execute("UPDATE deleted_rooms SET room_key = '가족들끼리' WHERE room_key = '나 빼고 가족방'")
     conn.execute("UPDATE deleted_rooms SET room_key = '엄마와 아빠' WHERE room_key = '부모님방'")
 
+    # 기기별 분리: 기존 프로필은 모두 'local' 기기 소유로 둔다.
+    profile_cols2 = [row["name"] for row in conn.execute("PRAGMA table_info(profiles)").fetchall()]
+    if "device_key" not in profile_cols2:
+        conn.execute("ALTER TABLE profiles ADD COLUMN device_key TEXT NOT NULL DEFAULT 'local'")
+    if "last_tick_at" not in profile_cols2:
+        conn.execute("ALTER TABLE profiles ADD COLUMN last_tick_at TEXT")
+    # 1회성: 전역 current_profile_id를 'local' 기기용 키로 옮긴다.
+    old_current = get_setting(conn, "current_profile_id")
+    if old_current is not None:
+        if get_setting(conn, "current_profile_id:local") is None:
+            set_setting(conn, "current_profile_id:local", old_current)
+        conn.execute("DELETE FROM settings WHERE key = 'current_profile_id'")
+
     # 기존 데이터 보존용 1회성 백필: profiles가 비어있고 characters에 데이터가 있으면
     # 기본 이름('나')으로 프로필 하나를 만들어 기존 캐릭터·방을 모두 그 프로필에 연결한다.
     profile_count = conn.execute("SELECT COUNT(*) AS n FROM profiles").fetchone()["n"]
     character_count = conn.execute("SELECT COUNT(*) AS n FROM characters").fetchone()["n"]
     if profile_count == 0 and character_count > 0:
-        cur = conn.execute("INSERT INTO profiles (name) VALUES (?)", ("나",))
+        cur = conn.execute("INSERT INTO profiles (name, device_key) VALUES (?, 'local')", ("나",))
         profile_id = cur.lastrowid
         conn.execute("UPDATE characters SET profile_id = ?", (profile_id,))
         conn.execute("UPDATE rooms SET profile_id = ?", (profile_id,))
-        conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES ('current_profile_id', ?)",
-            (str(profile_id),),
-        )
+        set_setting(conn, "current_profile_id:local", str(profile_id))
 
     conn.commit()
     conn.close()
 
 
 def get_current_profile_id(conn) -> int:
-    """settings.current_profile_id가 유효하면 그대로 쓰고, 아니면 가장 작은 id의 프로필로,
-    프로필이 아예 없으면 '나'라는 이름의 기본 프로필을 만들어 대체한다. 대체 시 settings도 갱신한다."""
-    row = conn.execute("SELECT value FROM settings WHERE key = 'current_profile_id'").fetchone()
-    if row is not None:
-        candidate_id = int(row["value"])
-        if conn.execute("SELECT 1 FROM profiles WHERE id = ?", (candidate_id,)).fetchone():
+    """현재 기기(X-Device-Key)의 current_profile_id가 유효하면 그대로 쓰고, 아니면 그 기기의
+    가장 작은 id의 프로필로, 그 기기에 프로필이 아예 없으면 '나'라는 기본 프로필을 만들어 대체한다.
+    대체 시 settings도 갱신한다."""
+    device_key = get_device_key()
+    setting_key = "current_profile_id:" + device_key
+    value = get_setting(conn, setting_key)
+    if value is not None:
+        candidate_id = int(value)
+        if conn.execute(
+            "SELECT 1 FROM profiles WHERE id = ? AND device_key = ?", (candidate_id, device_key)
+        ).fetchone():
             return candidate_id
 
-    fallback = conn.execute("SELECT id FROM profiles ORDER BY id LIMIT 1").fetchone()
+    fallback = conn.execute(
+        "SELECT id FROM profiles WHERE device_key = ? ORDER BY id LIMIT 1", (device_key,)
+    ).fetchone()
     if fallback is not None:
         profile_id = fallback["id"]
     else:
-        cur = conn.execute("INSERT INTO profiles (name) VALUES (?)", ("나",))
+        cur = conn.execute("INSERT INTO profiles (name, device_key) VALUES (?, ?)", ("나", device_key))
         profile_id = cur.lastrowid
 
-    conn.execute(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES ('current_profile_id', ?)",
-        (str(profile_id),),
-    )
+    set_setting(conn, setting_key, str(profile_id))
     conn.commit()
     return profile_id
 

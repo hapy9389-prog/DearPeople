@@ -2,7 +2,7 @@
 '경민' 프로필이 없으면 새로 만들고, 있으면 그 프로필로 전환한 뒤 비우고 다시 채운다.
 다른 프로필은 전혀 건드리지 않는다. 방/첫 대화 생성 단계에서만 AI를 호출한다."""
 
-from db import clear_profile_data, get_connection, init_db
+from db import clear_profile_data, get_connection, init_db, set_setting
 from routes_characters import CharacterSaveRequest, create_character
 from routes_profiles import ProfileCreateRequest, create_profile
 from routes_rooms import generate_rooms
@@ -11,7 +11,7 @@ MY_NAME = "경민"
 
 CHARACTERS = [
     {
-        "relation": "엄마", "grp": "family", "name": "은엽",
+        "relation": "엄마", "grp": "family", "name": "미영",
         "personality": "따뜻하고 다정하며 자식 걱정이 많은 성격. 잔소리가 많지만 그 안에 애정이 가득하다.",
         "speech_style": "부드러운 말투로 '얘'라고 부르며, 문장 끝에 '~해야지', '~해라'를 자주 붙인다.",
         "calls_me": "얘",
@@ -78,7 +78,9 @@ def seed_profile():
     다른 프로필은 건드리지 않는다."""
     conn = get_connection()
     try:
-        existing = conn.execute("SELECT id FROM profiles WHERE name = ?", (MY_NAME,)).fetchone()
+        existing = conn.execute(
+            "SELECT id FROM profiles WHERE name = ? AND device_key = 'local'", (MY_NAME,)
+        ).fetchone()
     finally:
         conn.close()
 
@@ -86,10 +88,7 @@ def seed_profile():
         profile_id = existing["id"]
         conn = get_connection()
         try:
-            conn.execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES ('current_profile_id', ?)",
-                (str(profile_id),),
-            )
+            set_setting(conn, "current_profile_id:local", str(profile_id))
             conn.commit()
         finally:
             conn.close()

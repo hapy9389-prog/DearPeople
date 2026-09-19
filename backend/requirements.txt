@@ -4,3 +4,4 @@ anthropic==0.125.0
 python-dotenv==1.2.1
 Pillow==10.4.0
 python-multipart==0.0.20
+psycopg2-binary==2.9.9

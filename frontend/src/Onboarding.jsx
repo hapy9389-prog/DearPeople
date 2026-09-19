@@ -80,6 +80,11 @@ function Onboarding({ onComplete, onExit }) {
 
       {step === 'name' && (
         <>
+          <p className="onboarding-intro">
+            가족과 친구를 AI 캐릭터로 만들어 두면, 카카오톡 단톡방처럼 서로 대화하고 사진도 나눠요.
+            내가 없는 방에서 오가는 이야기를 엿보거나, 직접 말을 걸 수도 있어요.
+            캐릭터의 기억을 고치면 이후의 말이 달라져요.
+          </p>
           <div className="field">
             <label>내 이름</label>
             <input

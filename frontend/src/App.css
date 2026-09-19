@@ -935,6 +935,19 @@ body {
   color: var(--text-muted);
 }
 
+.room-loader-hint {
+  margin-top: var(--gap-tight);
+  font-size: var(--fs-label);
+  color: var(--text-muted);
+}
+
+.onboarding-intro {
+  margin: 0 0 var(--gap-section);
+  font-size: var(--fs-secondary);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
 @keyframes room-loader-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

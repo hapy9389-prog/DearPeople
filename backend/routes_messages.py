@@ -10,7 +10,8 @@ from pydantic import BaseModel
 
 from ai import call_claude_json
 from db import get_connection, get_current_profile_id, get_profile_name
-from images import pick_photo
+from device import check_rate_limit
+from images import PHOTOS_DIR, pick_photo
 from routes_characters import build_character_description
 from routes_rooms import resolve_sender
 
@@ -31,7 +32,7 @@ REALISTIC_REACTION_INSTRUCTION = (
     "사용자가 힘들어하는 상황에서는 감정적 반응보다 걱정을 먼저 표현하세요."
 )
 
-UPLOAD_DIR = Path(__file__).parent / "static" / "photos" / "uploads"
+UPLOAD_DIR = PHOTOS_DIR / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024
@@ -330,6 +331,7 @@ def get_room_messages(room_id: int):
 
 @router.post("/api/rooms/{room_id}/messages")
 def post_room_message(room_id: int, body: MessageCreateRequest):
+    check_rate_limit("message", 10)  # 메시지 1개당 AI를 최대 5회 호출하므로 가장 비용이 큰 경로
     conn = get_connection()
     try:
         room_row = conn.execute(
@@ -366,6 +368,7 @@ def post_room_message(room_id: int, body: MessageCreateRequest):
 
 @router.post("/api/rooms/{room_id}/photo")
 def post_room_photo(room_id: int, file: UploadFile = File(...), caption: str = Form("")):
+    check_rate_limit("photo", 5)
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="png, jpg, webp 파일만 업로드할 수 있습니다.")
     data = file.file.read()

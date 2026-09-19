@@ -75,7 +75,7 @@ function RoomCreateSheet({ characters, onClose, onCreated }) {
           onClick={handleCreate}
           disabled={selectedIds.length === 0 || creating}
         >
-          {creating ? '만드는 중...' : '방 만들기'}
+          {creating ? '캐릭터들이 첫 대화를 만드는 중... (최대 30초)' : '방 만들기'}
         </button>
       </div>
     </div>

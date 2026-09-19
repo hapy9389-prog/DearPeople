@@ -159,7 +159,7 @@ function MemoryTab({ selectedCharacterId, onSelectCharacter }) {
           onClick={handleFindSuggestions}
           disabled={finding}
         >
-          {finding ? '찾는 중...' : '대화에서 찾기'}
+          {finding ? '최근 대화를 읽는 중... (최대 30초)' : '대화에서 찾기'}
         </button>
       </div>
 

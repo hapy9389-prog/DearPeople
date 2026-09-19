@@ -121,7 +121,7 @@ function CharacterForm({ onSaved, sheet = false, onClose }) {
           type="text"
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="예: 민수"
+          placeholder="예: 엄마, 민수, 지현"
         />
       </div>
       <div className="field">
@@ -130,7 +130,7 @@ function CharacterForm({ onSaved, sheet = false, onClose }) {
           type="text"
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
-          placeholder="이 사람은 어떤 사람인가요?"
+          placeholder="예: 걱정이 많아 잔소리를 자주 하지만 속정이 깊은 엄마"
         />
       </div>
     </>
@@ -189,7 +189,7 @@ function CharacterForm({ onSaved, sheet = false, onClose }) {
       onClick={handleDraft}
       disabled={loading === 'drafting' || !form.name.trim()}
     >
-      {loading === 'drafting' ? 'AI가 성격을 만드는 중...' : '초안 만들기'}
+      {loading === 'drafting' ? 'AI가 성격을 만드는 중... (최대 20초)' : '초안 만들기'}
     </button>
   ) : (
     <div className="character-form-actions">
@@ -207,7 +207,7 @@ function CharacterForm({ onSaved, sheet = false, onClose }) {
         onClick={handleRedraft}
         disabled={loading !== 'idle'}
       >
-        {loading === 'drafting' ? '다시 만드는 중...' : '다시 만들기'}
+        {loading === 'drafting' ? '다시 만드는 중... (최대 20초)' : '다시 만들기'}
       </button>
     </div>
   )

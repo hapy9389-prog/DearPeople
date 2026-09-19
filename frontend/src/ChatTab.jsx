@@ -107,12 +107,15 @@ function ChatTab({
           <span>자동 시간 흐르기</span>
         </label>
         <button type="button" className="btn-primary tick-button" onClick={handleTick} disabled={ticking}>
-          {ticking ? '시간이 흐르는 중...' : '시간 흐르기'}
+          {ticking ? '대화를 이어 만드는 중... (최대 1분)' : '시간 흐르기'}
         </button>
       </div>
       <div className="tick-hint">
-        {autoTickEnabled ? '자동으로 대화가 이어져요' : '켜면 대화가 계속 이어져요'}
+        {autoTickEnabled ? '켜져 있는 동안 5~20분마다 대화가 이어져요' : '앱을 다시 열면 그동안의 대화는 자동으로 채워져요'}
       </div>
+      {rooms.some((room) => !room.includes_me) && (
+        <div className="tick-hint">‘엿보기’ 방은 나 없이 캐릭터끼리 대화하는 방이에요</div>
+      )}
       {tickError && <div className="error-banner">{tickError}</div>}
       {rooms.length === 0 ? (
         <div className="empty-state">

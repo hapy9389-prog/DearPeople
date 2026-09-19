@@ -16,9 +16,12 @@ const TABS = [
 ]
 
 const AUTO_TICK_STORAGE_KEY = 'dearpeople_auto_tick_enabled'
-const LAST_AUTO_TICK_KEY = 'dearpeople_last_auto_tick_at'
-const AUTO_TICK_INTERVAL_MS = 3 * 60 * 1000
-const AUTO_TICK_MIN_GAP_MS = 60 * 1000
+const AUTO_TICK_MIN_MS = 5 * 60 * 1000
+const AUTO_TICK_MAX_MS = 20 * 60 * 1000
+
+function nextAutoTickDelay() {
+  return AUTO_TICK_MIN_MS + Math.random() * (AUTO_TICK_MAX_MS - AUTO_TICK_MIN_MS)
+}
 
 function App() {
   const [phase, setPhase] = useState('loading')
@@ -38,6 +41,7 @@ function App() {
   const [animateRoomList, setAnimateRoomList] = useState(false)
   const openRoomRef = useRef(openRoom)
   const autoTickRunningRef = useRef(false)
+  const catchupStartedRef = useRef(false)
 
   function openMemoriesForCharacter(characterId) {
     setMemoryTabCharacterId(characterId)
@@ -110,11 +114,12 @@ function App() {
     try { localStorage.setItem(AUTO_TICK_STORAGE_KEY, String(enabled)) } catch (e) { /* ignore */ }
   }
 
-  async function runAutoTick() {
+  // mode 'catchup': 앱을 열 때 지난 시간만큼 (서버가 경과 시간을 계산) / 'single': 켜져 있는 동안 방 하나
+  async function runAutoTick(mode) {
     if (autoTickRunningRef.current || openRoomRef.current) return
     autoTickRunningRef.current = true
     try {
-      const res = await apiRequest('/tick', { method: 'POST' })
+      const res = await apiRequest('/tick', { method: 'POST', body: JSON.stringify({ mode }) })
       setRoomBadges((prev) => {
         const next = { ...prev }
         for (const [roomId, count] of Object.entries(res.counts)) {
@@ -122,7 +127,6 @@ function App() {
         }
         return next
       })
-      try { localStorage.setItem(LAST_AUTO_TICK_KEY, String(Date.now())) } catch (e) { /* ignore */ }
       setTickVersion((v) => v + 1)
     } catch (e) {
       // 자동 호출 실패는 화면에 방해되지 않게 조용히 무시한다.
@@ -133,7 +137,14 @@ function App() {
 
   useEffect(() => {
     apiRequest('/rooms')
-      .then((rooms) => setPhase(rooms.length === 0 ? 'onboarding' : 'main'))
+      .then((rooms) => {
+        setPhase(rooms.length === 0 ? 'onboarding' : 'main')
+        // 앱을 열 때의 따라잡기는 토글과 무관하게, 앱을 연 뒤 딱 한 번만 실행한다.
+        if (rooms.length > 0 && !catchupStartedRef.current) {
+          catchupStartedRef.current = true
+          runAutoTick('catchup')
+        }
+      })
       .catch(() => setPhase('main'))
     apiRequest('/characters').then(setCharacters).catch(() => {})
     refreshProfile()
@@ -143,13 +154,18 @@ function App() {
     openRoomRef.current = openRoom
   }, [openRoom])
 
+  // 토글은 앱이 켜져 있는 동안의 5~20분 간격 생성만 제어한다.
   useEffect(() => {
     if (!autoTickEnabled) return
-    let lastAt = 0
-    try { lastAt = Number(localStorage.getItem(LAST_AUTO_TICK_KEY)) || 0 } catch (e) { /* ignore */ }
-    if (Date.now() - lastAt >= AUTO_TICK_MIN_GAP_MS) runAutoTick()
-    const intervalId = setInterval(runAutoTick, AUTO_TICK_INTERVAL_MS)
-    return () => clearInterval(intervalId)
+    let timeoutId
+    function schedule() {
+      timeoutId = setTimeout(async () => {
+        await runAutoTick('single')
+        schedule()
+      }, nextAutoTickDelay())
+    }
+    schedule()
+    return () => clearTimeout(timeoutId)
   }, [autoTickEnabled])
 
   if (phase === 'loading') {

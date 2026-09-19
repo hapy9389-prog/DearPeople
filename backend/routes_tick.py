@@ -1,12 +1,17 @@
 import concurrent.futures
+import contextvars
 import logging
 import os
 import random
+from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from ai import call_claude_json
 from db import get_connection, get_current_profile_id, get_profile_name
+from device import check_rate_limit
 from images import pick_photo
 from routes_characters import build_character_description
 from routes_messages import CHARACTER_PHOTO_PROBABILITY, fetch_recent_messages, format_recent_conversation
@@ -16,6 +21,11 @@ router = APIRouter()
 
 INITIATE_PROBABILITY = 0.3
 PHOTO_PROBABILITY = 0.5
+
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"  # created_at과 같은 UTC 문자열 형식
+CATCHUP_MIN_HOURS = 1
+CATCHUP_MANY_HOURS = 6
+CATCHUP_MANY_ROOMS = 3
 
 
 def fetch_room_members(conn, room_id):
@@ -154,8 +164,9 @@ def generate_initiate_messages(conn, room, members, my_name, chat_model):
     return resolve_generated_messages(result, name_to_id, my_name, allow_photo=True)
 
 
-def generate_tick_messages_for_room(room, my_name, chat_model):
+def generate_tick_messages_for_room(room, my_name, chat_model, force=False):
     """방 정보를 받아 메시지 dict 목록을 반환한다 (DB 쓰기 없음).
+    force=True(따라잡기/방 하나씩 생성)면 '나 포함 방'의 먼저 말 걸기 확률 판정을 건너뛴다.
     5단계에서 사진 타입을 추가할 때도 이 함수의 반환 형태(list of dict)를 그대로 확장한다."""
     conn = get_connection()
     try:
@@ -163,7 +174,7 @@ def generate_tick_messages_for_room(room, my_name, chat_model):
         if not members:
             return []
         if room["includes_me"]:
-            if random.random() >= INITIATE_PROBABILITY:
+            if not force and random.random() >= INITIATE_PROBABILITY:
                 return []
             return generate_initiate_messages(conn, room, members, my_name, chat_model)
         return generate_no_me_conversation(conn, room, members, my_name, chat_model)
@@ -171,8 +182,35 @@ def generate_tick_messages_for_room(room, my_name, chat_model):
         conn.close()
 
 
+class TickRequest(BaseModel):
+    # None: 수동 "시간 흐르기"(전체 방) / "catchup": 앱을 열 때 경과 시간만큼 / "single": 방 하나
+    mode: Optional[str] = None
+
+
+def pick_rooms_for_mode(conn, profile_id, rooms, mode):
+    """mode에 따라 생성할 방 목록을 정한다. 생성하지 않을 때는 빈 목록."""
+    if mode == "single":
+        return random.sample(rooms, 1) if rooms else []
+    if mode != "catchup":
+        return rooms
+    now = datetime.utcnow()
+    row = conn.execute("SELECT last_tick_at FROM profiles WHERE id = ?", (profile_id,)).fetchone()
+    if row["last_tick_at"] is None:
+        # 첫 실행: 기준 시각만 기록하고 생성하지 않는다.
+        conn.execute("UPDATE profiles SET last_tick_at = ? WHERE id = ?", (now.strftime(TIME_FORMAT), profile_id))
+        conn.commit()
+        return []
+    elapsed = now - datetime.strptime(row["last_tick_at"], TIME_FORMAT)
+    if elapsed < timedelta(hours=CATCHUP_MIN_HOURS):
+        return []
+    count = CATCHUP_MANY_ROOMS if elapsed >= timedelta(hours=CATCHUP_MANY_HOURS) else 1
+    return random.sample(rooms, min(count, len(rooms)))
+
+
 @router.post("/api/tick")
-def tick():
+def tick(body: Optional[TickRequest] = None):
+    mode = body.mode if body else None
+    check_rate_limit("tick", 3)
     conn = get_connection()
     try:
         profile_id = get_current_profile_id(conn)
@@ -181,11 +219,15 @@ def tick():
             (profile_id,),
         ).fetchall()]
         my_name = get_profile_name(conn, profile_id)
+        auto = mode in ("catchup", "single")
+        if not rooms and not auto:
+            raise HTTPException(status_code=400, detail="방이 없습니다.")
+        rooms = pick_rooms_for_mode(conn, profile_id, rooms, mode)
     finally:
         conn.close()
 
     if not rooms:
-        raise HTTPException(status_code=400, detail="방이 없습니다.")
+        return {"counts": {}}
 
     chat_model = os.environ.get("CHAT_MODEL")
 
@@ -193,7 +235,10 @@ def tick():
     failures = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         future_to_index = {
-            executor.submit(generate_tick_messages_for_room, room, my_name, chat_model): i
+            executor.submit(
+                contextvars.copy_context().run, generate_tick_messages_for_room,
+                room, my_name, chat_model, auto,
+            ): i
             for i, room in enumerate(rooms)
         }
         for future in concurrent.futures.as_completed(future_to_index):
@@ -223,6 +268,10 @@ def tick():
                     ),
                 )
             counts[str(room["id"])] = len(messages)
+        conn.execute(
+            "UPDATE profiles SET last_tick_at = ? WHERE id = ?",
+            (datetime.utcnow().strftime(TIME_FORMAT), profile_id),
+        )
         conn.commit()
     finally:
         conn.close()

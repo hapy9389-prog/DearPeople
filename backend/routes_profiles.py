@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from db import clear_profile_data, get_connection, get_current_profile_id
+from db import clear_profile_data, get_connection, get_current_profile_id, set_setting
+from device import get_device_key
 
 router = APIRouter()
 
@@ -33,7 +34,8 @@ def list_profiles():
         rows = conn.execute(
             "SELECT p.id, p.name, p.emoji, COUNT(c.id) AS character_count "
             "FROM profiles p LEFT JOIN characters c ON c.profile_id = p.id "
-            "GROUP BY p.id ORDER BY p.id"
+            "WHERE p.device_key = ? GROUP BY p.id ORDER BY p.id",
+            (get_device_key(),),
         ).fetchall()
         profiles = [dict(r) for r in rows]
     finally:
@@ -48,12 +50,11 @@ def create_profile(body: ProfileCreateRequest):
         raise HTTPException(status_code=400, detail="이름을 입력해주세요.")
     conn = get_connection()
     try:
-        cur = conn.execute("INSERT INTO profiles (name) VALUES (?)", (name,))
-        profile_id = cur.lastrowid
-        conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES ('current_profile_id', ?)",
-            (str(profile_id),),
+        cur = conn.execute(
+            "INSERT INTO profiles (name, device_key) VALUES (?, ?)", (name, get_device_key())
         )
+        profile_id = cur.lastrowid
+        set_setting(conn, "current_profile_id:" + get_device_key(), str(profile_id))
         conn.commit()
     finally:
         conn.close()
@@ -64,12 +65,11 @@ def create_profile(body: ProfileCreateRequest):
 def switch_current_profile(body: ProfileSwitchRequest):
     conn = get_connection()
     try:
-        if not conn.execute("SELECT 1 FROM profiles WHERE id = ?", (body.id,)).fetchone():
+        if not conn.execute(
+            "SELECT 1 FROM profiles WHERE id = ? AND device_key = ?", (body.id, get_device_key())
+        ).fetchone():
             raise HTTPException(status_code=404, detail="프로필을 찾을 수 없습니다.")
-        conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES ('current_profile_id', ?)",
-            (str(body.id),),
-        )
+        set_setting(conn, "current_profile_id:" + get_device_key(), str(body.id))
         conn.commit()
     finally:
         conn.close()
@@ -97,7 +97,9 @@ def set_profile_emoji(profile_id: int, body: ProfileEmojiRequest):
         raise HTTPException(status_code=400, detail="지원하지 않는 이모지입니다.")
     conn = get_connection()
     try:
-        if not conn.execute("SELECT 1 FROM profiles WHERE id = ?", (profile_id,)).fetchone():
+        if not conn.execute(
+            "SELECT 1 FROM profiles WHERE id = ? AND device_key = ?", (profile_id, get_device_key())
+        ).fetchone():
             raise HTTPException(status_code=404, detail="프로필을 찾을 수 없습니다.")
         conn.execute("UPDATE profiles SET emoji = ? WHERE id = ?", (body.emoji, profile_id))
         conn.commit()
@@ -110,9 +112,13 @@ def set_profile_emoji(profile_id: int, body: ProfileEmojiRequest):
 def delete_profile(profile_id: int):
     conn = get_connection()
     try:
-        if not conn.execute("SELECT id FROM profiles WHERE id = ?", (profile_id,)).fetchone():
+        if not conn.execute(
+            "SELECT id FROM profiles WHERE id = ? AND device_key = ?", (profile_id, get_device_key())
+        ).fetchone():
             raise HTTPException(status_code=404, detail="프로필을 찾을 수 없습니다.")
-        if conn.execute("SELECT COUNT(*) AS n FROM profiles").fetchone()["n"] <= 1:
+        if conn.execute(
+            "SELECT COUNT(*) AS n FROM profiles WHERE device_key = ?", (get_device_key(),)
+        ).fetchone()["n"] <= 1:
             raise HTTPException(status_code=400, detail="마지막 남은 프로필은 삭제할 수 없습니다.")
         current_id = get_current_profile_id(conn)
     finally:
@@ -124,11 +130,10 @@ def delete_profile(profile_id: int):
     try:
         conn.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
         if current_id == profile_id:
-            new_current_id = conn.execute("SELECT id FROM profiles ORDER BY id LIMIT 1").fetchone()["id"]
-            conn.execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES ('current_profile_id', ?)",
-                (str(new_current_id),),
-            )
+            new_current_id = conn.execute(
+                "SELECT id FROM profiles WHERE device_key = ? ORDER BY id LIMIT 1", (get_device_key(),)
+            ).fetchone()["id"]
+            set_setting(conn, "current_profile_id:" + get_device_key(), str(new_current_id))
         else:
             new_current_id = current_id
         conn.commit()

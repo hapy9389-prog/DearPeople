@@ -1,4 +1,5 @@
 import concurrent.futures
+import contextvars
 import logging
 import os
 from typing import List
@@ -163,7 +164,10 @@ def generate_rooms():
     results = [None] * len(room_plan)
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
     future_to_index = {
-        executor.submit(generate_room_messages, room, characters_by_id, my_name, chat_model): i
+        executor.submit(
+            contextvars.copy_context().run, generate_room_messages,
+            room, characters_by_id, my_name, chat_model,
+        ): i
         for i, room in enumerate(room_plan)
     }
     for future in concurrent.futures.as_completed(future_to_index):

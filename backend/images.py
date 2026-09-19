@@ -1,7 +1,13 @@
+import os
 import random
 from pathlib import Path
 
-PHOTOS_DIR = Path(__file__).parent / "static" / "photos"
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# 자리표시 사진과 업로드(uploads/)가 함께 있는 디렉터리. 환경변수가 없으면 저장소 안의 기본 경로.
+PHOTOS_DIR = Path(os.environ.get("PHOTOS_DIR") or Path(__file__).parent / "static" / "photos")
 
 CATEGORY_FILES = {
     "food": ["food_1.png", "food_2.png"],

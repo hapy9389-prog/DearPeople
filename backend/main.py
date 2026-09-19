@@ -1,16 +1,23 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from db import clear_profile_data, get_connection, get_current_profile_id, init_db
+from device import read_device_key
+from images import PHOTOS_DIR
 from routes_characters import router as characters_router
 from routes_memory_suggestions import router as memory_suggestions_router
 from routes_messages import router as messages_router
 from routes_profiles import router as profiles_router
 from routes_rooms import router as rooms_router
 from routes_tick import router as tick_router
+
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 @asynccontextmanager
@@ -22,7 +29,11 @@ async def lifespan(app: FastAPI):
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(lifespan=lifespan)
+PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+
+app = FastAPI(lifespan=lifespan, dependencies=[Depends(read_device_key)])
+# 더 구체적인 경로를 먼저 마운트한다 (PHOTOS_DIR이 저장소 밖일 수 있음).
+app.mount("/static/photos", StaticFiles(directory=str(PHOTOS_DIR)), name="photos")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.include_router(characters_router)
 app.include_router(memory_suggestions_router)

@@ -43,6 +43,7 @@ function RoomGenerateLoader({ characters, profileName, profileEmoji }) {
         </div>
       </div>
       <div className="room-loader-text">{PHRASES[phraseIndex]}</div>
+      <div className="room-loader-hint">캐릭터가 대화를 만들고 있어요. 30초~1분 정도 걸려요</div>
     </div>
   )
 }

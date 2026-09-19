@@ -1,20 +1,33 @@
 import json
+import logging
 import os
+import time
 
 import anthropic
 from dotenv import load_dotenv
 
+from device import get_device_key
+
 load_dotenv()
+
+logger = logging.getLogger("dearpeople.ai")
 
 
 def call_claude(system_prompt: str, messages: list, model: str, max_tokens: int = 1024) -> str:
     """Claude 호출을 모으는 단일 함수. model은 호출자가 CHAT_MODEL/FAST_MODEL 중 선택해서 넘긴다."""
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+    started = time.monotonic()
     response = client.messages.create(
         model=model,
         max_tokens=max_tokens,
         system=system_prompt,
         messages=messages,
+    )
+    # 사용량 확인용: journalctl -u dearpeople | grep AI_CALL
+    logger.info(
+        "AI_CALL model=%s in=%s out=%s ms=%d device=%s",
+        model, response.usage.input_tokens, response.usage.output_tokens,
+        (time.monotonic() - started) * 1000, get_device_key(),
     )
     for block in response.content:
         if block.type == "text":
